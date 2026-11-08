@@ -64,4 +64,24 @@ describe('AccountService', () => {
     await done;
     expect(service.selectedId()).toBeNull();
   });
+
+  it('funktioniert ohne verfügbaren Browser-Speicher', () => {
+    const get = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blockiert');
+    });
+    const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blockiert');
+    });
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    httpMock = TestBed.inject(HttpTestingController);
+    const fresh = TestBed.inject(AccountService);
+    expect(fresh.selectedId()).toBeNull();
+    fresh.select(4);
+    expect(fresh.selectedId()).toBe(4);
+    get.mockRestore();
+    set.mockRestore();
+  });
 });

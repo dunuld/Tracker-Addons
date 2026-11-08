@@ -684,5 +684,87 @@ describe('SettingsComponent', () => {
       httpMock.expectOne((r) => r.url.includes('api/statements')).flush([]);
       confirmSpy.mockRestore();
     });
+
+    it('ändert die Farbe und lässt einen unveränderten Namen unangetastet', async () => {
+      const fixture = await openAccountsTab();
+      const el = fixture.nativeElement as HTMLElement;
+      const name = el.querySelector('.account-name') as HTMLInputElement;
+      name.dispatchEvent(new Event('change'));
+
+      const color = el.querySelector('input[type=color]') as HTMLInputElement;
+      color.value = '#00ff00';
+      color.dispatchEvent(new Event('change'));
+      const req = httpMock.expectOne('api/accounts/1');
+      expect(req.request.body).toEqual({ color: '#00ff00' });
+      req.flush({ ...accounts()[0], color: '#00ff00' });
+      expect(fixture.componentInstance.accountList()[0]!.color).toBe('#00ff00');
+    });
+
+    it('zeigt Fehler beim Ändern und Löschen an', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const fixture = await openAccountsTab();
+      const component = fixture.componentInstance;
+
+      component.updateAccount(accounts()[0]!, { name: 'X' });
+      httpMock
+        .expectOne('api/accounts/1')
+        .flush({ error: 'Name ist erforderlich' }, { status: 400, statusText: 'Bad Request' });
+      expect(component.errorMsg()).toBe('Name ist erforderlich');
+
+      component.updateAccount(accounts()[0]!, { color: '#000000' });
+      httpMock.expectOne('api/accounts/1').error(new ProgressEvent('error'));
+      expect(component.errorMsg()).toBe('Konto konnte nicht geändert werden');
+
+      component.deleteAccount(accounts()[0]!);
+      httpMock.expectOne('api/accounts/1').error(new ProgressEvent('error'));
+      expect(component.errorMsg()).toBe('Fehler beim Löschen');
+      vi.restoreAllMocks();
+    });
+
+    it('löscht nichts, wenn das Löschen abgebrochen wird', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      const fixture = await openAccountsTab();
+      fixture.componentInstance.deleteAccount(accounts()[0]!);
+      httpMock.expectNone('api/accounts/1');
+      vi.restoreAllMocks();
+    });
+
+    it('meldet Ladefehler und zeigt ohne Konten einen Hinweis', async () => {
+      const fixture = TestBed.createComponent(SettingsComponent);
+      fixture.detectChanges();
+      httpMock.expectOne((req) => req.url.includes('api/categories')).flush([]);
+      httpMock.expectOne((req) => req.url.includes('api/rules')).flush([]);
+      httpMock.expectOne((req) => req.url.includes('api/statements')).flush([]);
+      httpMock.expectOne('api/accounts').error(new ProgressEvent('error'));
+      await fixture.whenStable();
+      fixture.componentInstance.activeTab.set('accounts');
+      fixture.detectChanges();
+      expect(fixture.componentInstance.errorMsg()).toBe('Konten konnten nicht geladen werden');
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Noch keine Konten');
+    });
+
+    it('zeigt „—“ für Konten ohne Auszug und schaltet über die Tab-Leiste um', async () => {
+      const fixture = TestBed.createComponent(SettingsComponent);
+      fixture.detectChanges();
+      httpMock.expectOne((req) => req.url.includes('api/categories')).flush([]);
+      httpMock.expectOne((req) => req.url.includes('api/rules')).flush([]);
+      httpMock.expectOne((req) => req.url.includes('api/statements')).flush([]);
+      httpMock
+        .expectOne('api/accounts')
+        .flush([{ ...accounts()[0], statementCount: 0, balanceCents: null, balanceMonth: null }]);
+      await fixture.whenStable();
+      const el = fixture.nativeElement as HTMLElement;
+      (
+        [...el.querySelectorAll('.tab')].find((t) =>
+          t.textContent?.includes('Konten'),
+        ) as HTMLElement
+      ).click();
+      fixture.detectChanges();
+      expect(fixture.componentInstance.activeTab()).toBe('accounts');
+      expect(el.querySelector('tbody tr')?.textContent).toContain('—');
+      expect(
+        fixture.componentInstance.balanceLabel(fixture.componentInstance.accountList()[0]!),
+      ).toBe('');
+    });
   });
 });

@@ -292,4 +292,35 @@ describe('UploadComponent', () => {
       expect(fixture.componentInstance.fileName()).toBe('');
     });
   });
+
+  it('weist auf ein neu angelegtes Konto hin und lädt die Kontenliste neu', async () => {
+    const fixture = TestBed.createComponent(UploadComponent);
+    fixture.detectChanges();
+    const file = new File(['dummy'], 'auszug.pdf', { type: 'application/pdf' });
+
+    const uploadPromise = fixture.componentInstance.upload(file);
+    httpMock
+      .expectOne((req) => req.url.includes('api/statements'))
+      .flush({ ...createMockImportResult(), accountCreated: true });
+    await uploadPromise;
+    httpMock.expectOne('api/accounts').flush([]);
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent;
+    expect(text).toContain('Girokonto (DE12345678901234567890)');
+    expect(text).toContain('Neu angelegt');
+  });
+
+  it('ignoriert Fehler beim Nachladen der Kontenliste', async () => {
+    const fixture = TestBed.createComponent(UploadComponent);
+    const component = fixture.componentInstance;
+    const uploadPromise = component.upload(new File(['x'], 'a.pdf'));
+    httpMock
+      .expectOne((req) => req.url.includes('api/statements'))
+      .flush({ ...createMockImportResult(), accountCreated: true });
+    await uploadPromise;
+    httpMock.expectOne('api/accounts').error(new ProgressEvent('error'));
+    await Promise.resolve();
+    expect(component.error()).toBeNull();
+  });
 });
