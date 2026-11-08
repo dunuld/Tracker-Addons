@@ -1,6 +1,7 @@
 <h2>Transaktionen</h2>
 
 <div class="filters">
+  <app-account-select />
   <div class="month-selector">
     <button class="btn-icon" (click)="prevMonth()" aria-label="Vorheriger Monat">‹</button>
     <span class="month-label">{{ monthLabel() }}</span>
@@ -40,6 +41,9 @@
       <thead>
         <tr>
           <th>Datum</th>
+          @if (showAccount()) {
+            <th class="account">Konto</th>
+          }
           <th class="type">Art</th>
           <th>Empfänger</th>
           <th class="purpose">Verwendungszweck</th>
@@ -51,6 +55,14 @@
         @for (tx of transactions(); track tx) {
           <tr>
             <td class="date">{{ tx.bookingDate | date: 'dd.MM.yyyy' }}</td>
+            @if (showAccount()) {
+              @let account = accounts.byId(tx.accountId);
+              <td class="account">
+                <span class="account-badge" [style.border-color]="account?.color ?? null">{{
+                  account?.name ?? '—'
+                }}</span>
+              </td>
+            }
             <td class="type">{{ tx.type }}</td>
             <td class="counterparty">{{ tx.counterparty }}</td>
             <td class="purpose" [title]="tx.purpose">{{ tx.purpose }}</td>

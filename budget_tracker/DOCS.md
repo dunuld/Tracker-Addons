@@ -34,6 +34,17 @@ geöffnet.
 
 Wurde ein Auszug bereits importiert, wird dies erkannt und du kannst ihn ersetzen.
 
+### Mehrere Konten
+
+Du kannst Auszüge mehrerer ING-Konten importieren, z. B. Girokonto und Gemeinschaftskonto. Beim
+ersten Import eines Auszugs wird das Konto anhand der IBAN automatisch angelegt, zunächst mit dem
+Namen `ING ••<letzte 4 Ziffern>`. Unter **Einstellungen → Konten** kannst du Name und Farbe ändern.
+
+Sobald es mehr als ein Konto gibt, erscheint in Übersicht, Transaktionen und Verlauf eine
+**Kontoauswahl**. Dort wählst du „Alle Konten“ oder ein einzelnes Konto. Die Auswahl gilt für alle
+Seiten und bleibt im Browser gespeichert. Unter „Alle Konten“ zeigt die Transaktionsliste
+zusätzlich, zu welchem Konto eine Buchung gehört.
+
 ### Monatsübersicht
 
 - Die Startseite zeigt Einnahmen, Ausgaben und Saldo des gewählten Monats.
@@ -58,7 +69,11 @@ Wurde ein Auszug bereits importiert, wird dies erkannt und du kannst ihn ersetze
 - **Kategorien**: Neue Kategorien anlegen (Name, Farbe, Typ) oder bestehende löschen.
 - **Regeln**: Kategorisierungsregeln verwalten (Feld, Match-Typ, Muster, Priorität).
   **Regeln neu anwenden** aktualisiert alle nicht manuell zugeordneten Buchungen.
-- **Auszüge**: Importierte Kontoauszüge auflisten und löschen.
+- **Konten**: Name und Farbe ändern, Saldo des jüngsten Auszugs sehen und festlegen, ob ein Konto
+  in „Alle Konten“ einfließt. Ein ausgeblendetes Konto, z. B. ein Tagesgeldkonto, ist nur zu sehen,
+  wenn es ausdrücklich ausgewählt ist. Beim Löschen eines Kontos werden auch alle seine Auszüge und
+  Buchungen gelöscht.
+- **Auszüge**: Importierte Kontoauszüge mit Konto auflisten und löschen.
 
 ### Darstellung
 
@@ -70,10 +85,10 @@ Wurde ein Auszug bereits importiert, wird dies erkannt und du kannst ihn ersetze
 Alle Daten werden lokal im persistenten Add-on-Verzeichnis `/data` gespeichert, das vom
 Supervisor verwaltet wird und bei Updates erhalten bleibt:
 
-| Pfad              | Beschreibung                                                    |
-| ----------------- | --------------------------------------------------------------- |
-| `/data/budget.db` | SQLite-Datenbank mit Kategorien, Regeln, Auszügen und Buchungen |
-| `/data/uploads/`  | Original-PDFs der hochgeladenen Kontoauszüge                    |
+| Pfad              | Beschreibung                                                            |
+| ----------------- | ----------------------------------------------------------------------- |
+| `/data/budget.db` | SQLite-Datenbank mit Konten, Kategorien, Regeln, Auszügen und Buchungen |
+| `/data/uploads/`  | Original-PDFs der hochgeladenen Kontoauszüge                            |
 
 Die Daten verlassen niemals dein Home-Assistant-System und sind in Home-Assistant-Backups des
 Add-ons enthalten.

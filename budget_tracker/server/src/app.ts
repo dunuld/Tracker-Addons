@@ -5,6 +5,7 @@ import type { ApiError, HealthResponse } from '../../shared/api-types.js';
 import { Categorizer } from './categorization/categorizer.js';
 import type { Database } from './db/database.js';
 import { HttpError } from './http-error.js';
+import { accountsRouter } from './routes/accounts.js';
 import { categoriesRouter } from './routes/categories.js';
 import { reportsRouter } from './routes/reports.js';
 import { rulesRouter } from './routes/rules.js';
@@ -67,6 +68,7 @@ export function createApp(db: Database, options: AppOptions = {}): Express {
     categorize: (tx) => categorizer.apply(tx),
   });
 
+  api.use('/accounts', accountsRouter(db, imports));
   api.use('/statements', statementsRouter(imports));
   api.use('/categories', categoriesRouter(db));
   api.use('/rules', rulesRouter(db));

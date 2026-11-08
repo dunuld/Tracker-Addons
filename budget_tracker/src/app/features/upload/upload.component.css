@@ -115,3 +115,9 @@ h2 {
     margin-bottom: 0.4rem;
   }
 }
+
+.new-account {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--bt-text-secondary);
+}

@@ -2,7 +2,22 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import TransactionsComponent from './transactions.component';
-import type { Transaction, Category } from '../../../../shared/api-types';
+import { AccountService } from '../../core/account.service';
+import type { Account, Transaction, Category } from '../../../../shared/api-types';
+
+const mockAccount = (id: number, overrides: Partial<Account> = {}): Account => ({
+  id,
+  iban: `DE0000000000000000000${id}`,
+  bank: 'ING',
+  name: `Konto ${id}`,
+  color: '#2196f3',
+  sort: id,
+  includeInReports: true,
+  statementCount: 1,
+  balanceCents: 1000,
+  balanceMonth: '2026-10',
+  ...overrides,
+});
 
 describe('TransactionsComponent', () => {
   let httpMock: HttpTestingController;
@@ -11,6 +26,7 @@ describe('TransactionsComponent', () => {
     {
       id: 1,
       statementId: 1,
+      accountId: 1,
       bookingDate: '2024-01-15',
       valueDate: '2024-01-15',
       type: 'UEM',
@@ -24,6 +40,7 @@ describe('TransactionsComponent', () => {
     {
       id: 2,
       statementId: 1,
+      accountId: 1,
       bookingDate: '2024-01-20',
       valueDate: '2024-01-20',
       type: 'UEM',
@@ -334,6 +351,55 @@ describe('TransactionsComponent', () => {
         .flush({ error: 'Kategorie nicht gefunden' }, { status: 404, statusText: 'Not Found' });
       await done;
       expect(component.error()).toBe('Kategorie nicht gefunden');
+    });
+  });
+
+  describe('Konten', () => {
+    // load() wartet auf Promise.all – Mikrotasks abarbeiten lassen
+    const settle = () => new Promise((resolve) => setTimeout(resolve));
+
+    it('filtert nach dem gewählten Konto und blendet die Konto-Spalte dann aus', async () => {
+      const accounts = TestBed.inject(AccountService);
+      accounts.accounts.set([mockAccount(1, { name: 'Giro' }), mockAccount(2)]);
+      const fixture = TestBed.createComponent(TransactionsComponent);
+      fixture.detectChanges();
+      httpMock
+        .expectOne((req) => req.url.includes('api/transactions') && !req.params.has('accountId'))
+        .flush(createMockTransactions());
+      httpMock.expectOne((req) => req.url.includes('api/categories')).flush(createMockCategories());
+      await settle();
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.account-select')).toBeTruthy();
+      expect(el.querySelector('td.account')?.textContent).toContain('Giro');
+
+      accounts.select(2);
+      fixture.detectChanges();
+      httpMock
+        .expectOne(
+          (req) => req.url.includes('api/transactions') && req.params.get('accountId') === '2',
+        )
+        .flush(createMockTransactions());
+      httpMock.expectOne((req) => req.url.includes('api/categories')).flush(createMockCategories());
+      await settle();
+      fixture.detectChanges();
+      expect(el.querySelector('td.account')).toBeNull();
+      accounts.select(null);
+    });
+
+    it('zeigt ohne mehrere Konten weder Auswahl noch Konto-Spalte', async () => {
+      TestBed.inject(AccountService).accounts.set([mockAccount(1)]);
+      const fixture = TestBed.createComponent(TransactionsComponent);
+      fixture.detectChanges();
+      httpMock
+        .expectOne((req) => req.url.includes('api/transactions'))
+        .flush(createMockTransactions());
+      httpMock.expectOne((req) => req.url.includes('api/categories')).flush(createMockCategories());
+      await settle();
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('.account-select')).toBeNull();
+      expect(el.querySelector('th.account')).toBeNull();
     });
   });
 });

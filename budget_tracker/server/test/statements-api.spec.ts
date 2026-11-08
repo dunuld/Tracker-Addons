@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { ImportResult, Statement } from '../../shared/api-types.js';
+import type { Account, ImportResult, Statement } from '../../shared/api-types.js';
 import { createApp } from '../src/app.js';
 import { openDatabase, type Database } from '../src/db/database.js';
 import { MAX_UPLOAD_BYTES } from '../src/routes/statements.js';
@@ -46,6 +46,7 @@ describe('POST api/statements', () => {
       periodFrom: '2026-10-01',
       periodTo: '2026-10-31',
       transactionCount: 19,
+      accountCreated: true,
       sumCents: 311034,
       balanceOk: true,
       warnings: [],
@@ -56,6 +57,7 @@ describe('POST api/statements', () => {
         month: 10,
         openingCents: 120000,
         closingCents: 431034,
+        accountName: 'ING ••8801',
         fileName: FILE_NAME,
         transactionCount: 19,
       },
@@ -163,5 +165,44 @@ describe('GET/DELETE api/statements', () => {
   it('funktioniert ohne Upload-Verzeichnis', async () => {
     const plain = createApp(db);
     await request(plain).post('/api/statements').attach('file', fixture, FILE_NAME).expect(201);
+  });
+});
+
+describe('Konten beim Import', () => {
+  it('legt das Konto beim ersten Import an und verwendet es danach wieder', async () => {
+    const first = (await upload(fixture).expect(201)).body as ImportResult;
+    expect(first.accountCreated).toBe(true);
+    const replaced = (await upload(fixture, FILE_NAME, '?replace=true').expect(201))
+      .body as ImportResult;
+    expect(replaced.accountCreated).toBe(false);
+    expect(replaced.statement.accountId).toBe(first.statement.accountId);
+
+    const accounts = (await request(app).get('/api/accounts').expect(200)).body as Account[];
+    expect(accounts).toEqual([
+      {
+        id: first.statement.accountId,
+        iban: 'DE58500105175435728801',
+        bank: 'ING',
+        name: 'ING ••8801',
+        color: '#2196f3',
+        sort: 0,
+        includeInReports: true,
+        statementCount: 1,
+        balanceCents: 431034,
+        balanceMonth: '2026-10',
+      },
+    ]);
+  });
+
+  it('löscht ein Konto samt Auszügen, Buchungen und PDF-Dateien', async () => {
+    const { statement } = (await upload(fixture).expect(201)).body as ImportResult;
+    expect(existsSync(join(uploadsDir, `${fixtureHash}.pdf`))).toBe(true);
+
+    await request(app).delete(`/api/accounts/${statement.accountId}`).expect(204);
+    expect(count('SELECT COUNT(*) AS n FROM accounts')).toBe(0);
+    expect(count('SELECT COUNT(*) AS n FROM statements')).toBe(0);
+    expect(count('SELECT COUNT(*) AS n FROM transactions')).toBe(0);
+    expect(existsSync(join(uploadsDir, `${fixtureHash}.pdf`))).toBe(false);
+    await request(app).delete(`/api/accounts/${statement.accountId}`).expect(404);
   });
 });

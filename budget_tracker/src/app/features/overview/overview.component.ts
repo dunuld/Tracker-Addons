@@ -1,17 +1,20 @@
 import { Component, computed, signal, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { AccountService } from '../../core/account.service.js';
 import { ApiService } from '../../core/api.service.js';
 import { formatEuro as fmtEuro, formatMonthYear as fmtMonthYear } from '../../core/format.js';
+import AccountSelectComponent from '../../shared/account-select.component.js';
 import ChartComponent from '../../shared/chart.component.js';
 import type { MonthlyReport } from '../../../../shared/api-types';
 
 @Component({
   selector: 'app-overview',
   standalone: true,
-  imports: [RouterLink, ChartComponent],
+  imports: [RouterLink, ChartComponent, AccountSelectComponent],
   template: `
     <div class="page-header">
       <h2>Monatsübersicht</h2>
+      <app-account-select />
       <div class="month-nav">
         <button
           class="btn-icon"
@@ -271,6 +274,7 @@ import type { MonthlyReport } from '../../../../shared/api-types';
 })
 export default class OverviewComponent {
   private readonly api = inject(ApiService);
+  private readonly accounts = inject(AccountService);
 
   readonly currentYear = signal(new Date().getFullYear());
   readonly currentMonth = signal(new Date().getMonth() + 1);
@@ -295,11 +299,13 @@ export default class OverviewComponent {
 
   constructor() {
     this.load();
+    this.accounts.onSelectionChange(() => this.load());
   }
 
   load() {
     this.loading.set(true);
-    this.api.monthlyReport(this.currentYear(), this.currentMonth()).subscribe({
+    const accountId = this.accounts.selectedId();
+    this.api.monthlyReport(this.currentYear(), this.currentMonth(), accountId).subscribe({
       next: (data) => {
         this.report.set(data);
         this.loading.set(false);

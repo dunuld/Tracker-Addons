@@ -10,6 +10,8 @@ describe('UploadComponent', () => {
   const createMockImportResult = (): ImportResult => ({
     statement: {
       id: 1,
+      accountId: 1,
+      accountName: 'Girokonto',
       bank: 'TestBank',
       iban: 'DE12345678901234567890',
       year: 2024,
@@ -23,6 +25,7 @@ describe('UploadComponent', () => {
     periodFrom: '2024-01-01',
     periodTo: '2024-01-31',
     transactionCount: 25,
+    accountCreated: false,
     uncategorizedCount: 3,
     sumCents: -120000,
     balanceOk: true,

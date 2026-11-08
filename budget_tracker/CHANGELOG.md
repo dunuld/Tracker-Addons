@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.2.0 (2026-11-08)
+
+### Neu
+
+- **Mehrere Konten**: Beim Import wird je IBAN automatisch ein Konto angelegt. Übersicht,
+  Transaktionen und Verlauf haben eine Kontoauswahl („Alle Konten“ oder ein einzelnes Konto), die
+  im Browser gespeichert bleibt. Unter „Alle Konten“ zeigt die Transaktionsliste das Konto jeder
+  Buchung.
+- **Einstellungen → Konten**: Name und Farbe ändern, Saldo des jüngsten Auszugs anzeigen, Konto aus
+  „Alle Konten“ ausblenden und Konto samt Auszügen löschen
+- **Upload**: Das Import-Ergebnis zeigt das Konto und weist darauf hin, wenn es neu angelegt wurde
+
+### Technik
+
+- Datenbank-Schema v2 mit neuer Tabelle `accounts`. Vorhandene Daten werden beim Start automatisch
+  migriert: Aus jeder IBAN wird ein Konto.
+- API: `GET/PATCH/DELETE api/accounts`, optionaler Parameter `accountId` für `api/transactions`,
+  `api/reports/monthly` und `api/reports/trend`; `Statement` und `Transaction` enthalten die
+  Konto-ID
+
 ## 1.1.1 (2026-11-06)
 
 ### Geändert
