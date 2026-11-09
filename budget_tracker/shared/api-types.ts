@@ -155,6 +155,16 @@ export interface CategoryTotal {
   count: number;
 }
 
+export interface AccountBalance {
+  accountId: number;
+  name: string;
+  color: string;
+  /** Neuer Saldo des jüngsten Auszugs bis einschließlich zum Berichtsmonat */
+  balanceCents: number;
+  /** Monat dieses Auszugs (`YYYY-MM`); älter als der Berichtsmonat, wenn dessen Auszug fehlt */
+  asOf: string;
+}
+
 export interface MonthlyReport {
   year: number;
   month: number;
@@ -163,6 +173,10 @@ export interface MonthlyReport {
   expenseCents: number;
   balanceCents: number;
   categories: CategoryTotal[];
+  /** Kontostände zum Monatsende (gleiche Kontoauswahl wie der Bericht); Konten ohne Auszug fehlen */
+  accountBalances: AccountBalance[];
+  /** Summe der Kontostände; `null`, wenn kein Konto einen Auszug bis zu diesem Monat hat */
+  totalBalanceCents: number | null;
 }
 
 export interface TrendMonth {

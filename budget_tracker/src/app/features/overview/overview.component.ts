@@ -54,6 +54,36 @@ import type { MonthlyReport } from '../../../../shared/api-types';
         </div>
       </div>
 
+      @if (report()!.accountBalances?.length) {
+        <div class="balances bt-card">
+          <h3>Kontostände zum Monatsende</h3>
+          <ul>
+            @for (b of report()!.accountBalances; track b.accountId) {
+              <li>
+                <span class="color-dot" [style.background]="b.color"></span>
+                <span class="balance-name">
+                  {{ b.name }}
+                  @if (b.asOf !== currentYearMonth()) {
+                    <span class="as-of">Stand {{ formatYearMonth(b.asOf) }}</span>
+                  }
+                </span>
+                <span class="balance-value" [class.negative]="b.balanceCents < 0">{{
+                  formatEuro(b.balanceCents)
+                }}</span>
+              </li>
+            }
+            @if (report()!.accountBalances.length > 1) {
+              <li class="total">
+                <span class="balance-name">Gesamt</span>
+                <span class="balance-value" [class.negative]="report()!.totalBalanceCents! < 0">{{
+                  formatEuro(report()!.totalBalanceCents!)
+                }}</span>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+
       @if (expenseCategories().length > 0) {
         <div class="chart-section bt-card">
           <h3>Ausgaben nach Kategorie</h3>
@@ -189,8 +219,48 @@ import type { MonthlyReport } from '../../../../shared/api-types';
       white-space: nowrap;
     }
 
-    .chart-section h3 {
+    .chart-section h3,
+    .balances h3 {
       margin: 0 0 1rem;
+    }
+    .balances ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .balances li {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--bt-border);
+    }
+    .balances li:last-child {
+      border-bottom: none;
+    }
+    .balances .color-dot {
+      margin-right: 0;
+      flex: none;
+    }
+    .balance-name {
+      flex: 1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .as-of {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--bt-text-muted);
+    }
+    .balance-value {
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .balance-value.negative {
+      color: var(--bt-error-text);
+    }
+    .balances li.total {
+      font-weight: 600;
     }
     .chart-container {
       max-width: 400px;
@@ -288,6 +358,15 @@ export default class OverviewComponent {
   });
 
   readonly abs = Math.abs;
+
+  readonly currentYearMonth = computed(
+    () => `${this.currentYear()}-${String(this.currentMonth()).padStart(2, '0')}`,
+  );
+
+  formatYearMonth(yearMonth: string): string {
+    const [year, month] = yearMonth.split('-').map(Number);
+    return fmtMonthYear(year!, month!);
+  }
 
   formatEuro(cents: number): string {
     return fmtEuro(cents);
