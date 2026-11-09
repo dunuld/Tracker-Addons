@@ -402,4 +402,19 @@ describe('TransactionsComponent', () => {
       expect(el.querySelector('th.account')).toBeNull();
     });
   });
+
+  it('markiert automatisch erkannte Umbuchungen', async () => {
+    const fixture = TestBed.createComponent(TransactionsComponent);
+    fixture.detectChanges();
+    const [first, second] = createMockTransactions();
+    httpMock
+      .expectOne((req) => req.url.includes('api/transactions'))
+      .flush([{ ...first!, categorySource: 'transfer' }, second!]);
+    httpMock.expectOne((req) => req.url.includes('api/categories')).flush(createMockCategories());
+    await new Promise((resolve) => setTimeout(resolve));
+    fixture.detectChanges();
+    const markers = (fixture.nativeElement as HTMLElement).querySelectorAll('.auto-transfer');
+    expect(markers.length).toBe(1);
+    expect(markers[0]!.getAttribute('title')).toContain('Umbuchung');
+  });
 });

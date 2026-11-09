@@ -26,6 +26,7 @@ describe('UploadComponent', () => {
     periodTo: '2024-01-31',
     transactionCount: 25,
     accountCreated: false,
+    transferCount: 0,
     uncategorizedCount: 3,
     sumCents: -120000,
     balanceOk: true,
@@ -322,5 +323,18 @@ describe('UploadComponent', () => {
     httpMock.expectOne('api/accounts').error(new ProgressEvent('error'));
     await Promise.resolve();
     expect(component.error()).toBeNull();
+  });
+
+  it('zeigt erkannte Umbuchungen im Import-Ergebnis', async () => {
+    const fixture = TestBed.createComponent(UploadComponent);
+    const uploadPromise = fixture.componentInstance.upload(new File(['x'], 'a.pdf'));
+    httpMock
+      .expectOne((req) => req.url.includes('api/statements'))
+      .flush({ ...createMockImportResult(), transferCount: 2 });
+    await uploadPromise;
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+      '2 Buchungen als Umbuchung zwischen eigenen Konten erkannt',
+    );
   });
 });

@@ -45,6 +45,23 @@ Sobald es mehr als ein Konto gibt, erscheint in Übersicht, Transaktionen und Ve
 Seiten und bleibt im Browser gespeichert. Unter „Alle Konten“ zeigt die Transaktionsliste
 zusätzlich, zu welchem Konto eine Buchung gehört.
 
+#### Umbuchungen zwischen eigenen Konten
+
+Überweisungen zwischen deinen Konten sind weder Einnahme noch Ausgabe. Das Haushaltsbuch erkennt
+sie automatisch und ordnet beide Seiten der Kategorie **Umbuchungen** zu (die erste Kategorie vom
+Typ „Umbuchung“). Diese Buchungen zählen dann nicht mehr zu Einnahmen und Ausgaben:
+
+- **Gegenbuchung**: Eine Abbuchung auf einem Konto und eine Gutschrift über genau denselben Betrag
+  auf einem anderen deiner Konten, höchstens 3 Tage auseinander. Dafür müssen die Auszüge beider
+  Konten importiert sein.
+- **IBAN**: Steht die IBAN eines anderen deiner Konten im Empfänger oder Verwendungszweck, gilt
+  die Buchung auch ohne importierten Gegenauszug als Umbuchung.
+
+Automatisch erkannte Umbuchungen sind in der Transaktionsliste mit ⇄ markiert. Ist eine Buchung
+fälschlich erkannt, ordne sie einfach manuell einer anderen Kategorie zu – manuelle Zuordnungen
+werden nie überschrieben. Die Erkennung läuft beim Import, beim Löschen von Auszügen oder Konten
+und bei **Regeln neu anwenden**.
+
 ### Monatsübersicht
 
 - Die Startseite zeigt Einnahmen, Ausgaben und Saldo des gewählten Monats.
@@ -96,6 +113,11 @@ Supervisor verwaltet wird und bei Updates erhalten bleibt:
 
 Die Daten verlassen niemals dein Home-Assistant-System und sind in Home-Assistant-Backups des
 Add-ons enthalten.
+
+Die Datenbank wird beim ersten Start angelegt; es gibt keine automatischen Migrationen. Passt eine
+vorhandene `budget.db` nicht zur installierten Version (z. B. aus einer Vorabversion vor 1.4.0),
+startet das Add-on mit einer Fehlermeldung. Lösche dann `/data/budget.db` und `/data/uploads/`
+und importiere die Kontoauszüge neu.
 
 ## Bekannte Einschränkungen
 

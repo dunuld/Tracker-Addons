@@ -108,7 +108,8 @@ export class Categorizer {
   }
 
   /**
-   * Wendet Regeln auf alle nicht-manuell zugeordneten Buchungen an.
+   * Wendet Regeln auf alle nicht manuell zugeordneten und nicht als Umbuchung erkannten
+   * Buchungen an (Umbuchungen prüft `TransferDetector`).
    * Gibt die Anzahl der tatsächlich geänderten Buchungen zurück.
    */
   reapply(): number {
@@ -117,7 +118,7 @@ export class Categorizer {
       const rows = this.db
         .prepare(
           `SELECT id, counterparty, purpose, category_id, category_source, rule_id
-           FROM transactions WHERE category_source != 'manual'`,
+           FROM transactions WHERE category_source NOT IN ('manual', 'transfer')`,
         )
         .all() as {
         id: number;

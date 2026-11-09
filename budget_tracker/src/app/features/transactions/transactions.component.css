@@ -141,6 +141,16 @@ tbody tr:hover {
   color: var(--bt-success-text);
 }
 
+td.category {
+  white-space: nowrap;
+}
+
+.auto-transfer {
+  margin-right: 0.35rem;
+  color: var(--bt-text-secondary);
+  cursor: help;
+}
+
 td select {
   height: 32px;
   padding: 0 0.3rem;

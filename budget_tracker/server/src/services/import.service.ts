@@ -23,6 +23,11 @@ export interface ImportServiceOptions {
   parsers?: BankParser[];
   /** Standard: alle Buchungen in die Fallback-Kategorie. */
   categorize?: Categorize;
+  /**
+   * Erkennt Umbuchungen zwischen eigenen Konten; läuft innerhalb der Transaktion von Import und
+   * Löschen und liefert die Zahl geänderter Buchungen. Standard: keine Erkennung.
+   */
+  detectTransfers?: () => number;
 }
 
 export interface ImportOptions {
@@ -68,6 +73,7 @@ export class ImportService {
   private readonly uploadsDir: string | null;
   private readonly parsers: BankParser[];
   private readonly categorize: Categorize;
+  private readonly detectTransfers: () => number;
 
   constructor(
     private readonly db: Database,
@@ -76,6 +82,7 @@ export class ImportService {
     this.uploadsDir = options.uploadsDir ?? null;
     this.parsers = options.parsers ?? [new IngParser()];
     this.categorize = options.categorize ?? this.defaultCategorize();
+    this.detectTransfers = options.detectTransfers ?? (() => 0);
   }
 
   async importPdf(
@@ -153,9 +160,9 @@ export class ImportService {
       warnings.push('Im Kontoauszug wurden keine Buchungen gefunden.');
 
     const assignments = parsed.transactions.map((tx) => this.categorize(tx));
-    const uncategorizedCount = assignments.filter((a) => a.source === 'default').length;
 
     let accountCreated = false;
+    let transferCount = 0;
     const statementId = transaction(this.db, () => {
       const remove = this.db.prepare('DELETE FROM statements WHERE id = ?');
       for (const duplicate of duplicates) remove.run(duplicate.id);
@@ -213,8 +220,16 @@ export class ImportService {
           assignment.ruleId,
         );
       });
+      transferCount = this.detectTransfers();
       return Number(lastInsertRowid);
     });
+    const uncategorizedCount = Number(
+      this.db
+        .prepare(
+          "SELECT COUNT(*) AS n FROM transactions WHERE statement_id = ? AND category_source = 'default'",
+        )
+        .get(statementId)?.['n'],
+    );
 
     // Dateien erst nach erfolgreichem Commit anfassen; ersetzte Dateien vor dem Schreiben entfernen.
     for (const row of duplicateRows) this.deleteFile(String(row['file_hash']));
@@ -227,6 +242,7 @@ export class ImportService {
       transactionCount: parsed.transactions.length,
       accountCreated,
       uncategorizedCount,
+      transferCount,
       sumCents,
       balanceOk,
       warnings,
@@ -250,7 +266,11 @@ export class ImportService {
   deleteStatement(id: number): void {
     const row = this.db.prepare('SELECT file_hash FROM statements WHERE id = ?').get(id);
     if (!row) throw notFound('Kontoauszug nicht gefunden');
-    this.db.prepare('DELETE FROM statements WHERE id = ?').run(id);
+    transaction(this.db, () => {
+      this.db.prepare('DELETE FROM statements WHERE id = ?').run(id);
+      // Gegenbuchungen auf anderen Konten sind ggf. keine Umbuchung mehr
+      this.detectTransfers();
+    });
     this.deleteFile(String(row['file_hash']));
   }
 
@@ -262,7 +282,10 @@ export class ImportService {
       .prepare('SELECT file_hash FROM statements WHERE account_id = ?')
       .all(id)
       .map((row) => String(row['file_hash']));
-    this.db.prepare('DELETE FROM accounts WHERE id = ?').run(id);
+    transaction(this.db, () => {
+      this.db.prepare('DELETE FROM accounts WHERE id = ?').run(id);
+      this.detectTransfers();
+    });
     for (const hash of hashes) this.deleteFile(hash);
   }
 

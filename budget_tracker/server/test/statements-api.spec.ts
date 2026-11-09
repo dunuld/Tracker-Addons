@@ -47,6 +47,7 @@ describe('POST api/statements', () => {
       periodTo: '2026-10-31',
       transactionCount: 19,
       accountCreated: true,
+      transferCount: 0,
       sumCents: 311034,
       balanceOk: true,
       warnings: [],

@@ -70,6 +70,14 @@
               {{ formatEuro(tx.amountCents) }}
             </td>
             <td class="category">
+              @if (tx.categorySource === 'transfer') {
+                <span
+                  class="auto-transfer"
+                  title="Automatisch als Umbuchung zwischen eigenen Konten erkannt"
+                  aria-label="Automatisch als Umbuchung erkannt"
+                  >⇄</span
+                >
+              }
               <select (change)="onCategoryChange(tx, $event)" aria-label="Kategorie">
                 <option value="" disabled [selected]="tx.categoryId === null">
                   — unkategorisiert —
