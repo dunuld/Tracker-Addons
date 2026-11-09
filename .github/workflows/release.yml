@@ -112,7 +112,7 @@ jobs:
           echo "$entry" > release_notes.md
 
       - name: GitHub Release erstellen
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: ${{ needs.prepare.outputs.name }} ${{ needs.prepare.outputs.version }}
           files: LICENSE
