@@ -1,6 +1,8 @@
 import { Component, computed, signal, inject } from '@angular/core';
+import { AccountService } from '../../core/account.service.js';
 import { ApiService } from '../../core/api.service.js';
 import { formatMonthYear as fmtMonthYear } from '../../core/format.js';
+import AccountSelectComponent from '../../shared/account-select.component.js';
 import ChartComponent from '../../shared/chart.component.js';
 import type { TooltipItem } from 'chart.js';
 import type { TrendMonth, TrendReport } from '../../../../shared/api-types';
@@ -8,10 +10,11 @@ import type { TrendMonth, TrendReport } from '../../../../shared/api-types';
 @Component({
   selector: 'app-trend',
   standalone: true,
-  imports: [ChartComponent],
+  imports: [ChartComponent, AccountSelectComponent],
   template: `
     <h2>Verlauf</h2>
     <div class="range-selector">
+      <app-account-select />
       <label>
         Von
         <input type="month" [value]="fromMonth()" (change)="onFromChange($event)" />
@@ -173,6 +176,7 @@ import type { TrendMonth, TrendReport } from '../../../../shared/api-types';
 })
 export default class TrendComponent {
   private readonly api = inject(ApiService);
+  private readonly accounts = inject(AccountService);
 
   readonly fromMonth = signal(this.defaultFrom());
   readonly toMonth = signal(this.defaultTo());
@@ -213,6 +217,7 @@ export default class TrendComponent {
 
   constructor() {
     this.load();
+    this.accounts.onSelectionChange(() => this.load());
   }
 
   load() {
@@ -220,7 +225,7 @@ export default class TrendComponent {
     const to = this.toMonth();
     if (!from || !to) return;
     this.loading.set(true);
-    this.api.trendReport(from, to).subscribe({
+    this.api.trendReport(from, to, this.accounts.selectedId()).subscribe({
       next: (data) => {
         this.report.set(data);
         this.loading.set(false);

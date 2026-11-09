@@ -3,6 +3,7 @@ import { provideHttpClientTesting, HttpTestingController } from '@angular/common
 import { provideHttpClient } from '@angular/common/http';
 import { RouterTestingModule } from '@angular/router/testing';
 import OverviewComponent from './overview.component';
+import { AccountService } from '../../core/account.service';
 import type { MonthlyReport } from '../../../../shared/api-types';
 
 describe('OverviewComponent', () => {
@@ -222,5 +223,26 @@ describe('OverviewComponent', () => {
 
     const req = httpMock.expectOne((req) => req.url.includes('api/reports/monthly'));
     req.flush({} as MonthlyReport);
+  });
+
+  it('lädt die Übersicht neu, wenn ein anderes Konto gewählt wird', async () => {
+    const accounts = TestBed.inject(AccountService);
+    const fixture = TestBed.createComponent(OverviewComponent);
+    fixture.detectChanges();
+    httpMock
+      .expectOne((req) => req.url.includes('api/reports/monthly') && !req.params.has('accountId'))
+      .flush(createMockReport());
+
+    accounts.select(7);
+    fixture.detectChanges();
+    httpMock
+      .expectOne(
+        (req) => req.url.includes('api/reports/monthly') && req.params.get('accountId') === '7',
+      )
+      .flush(createMockReport());
+    await fixture.whenStable();
+    accounts.select(null);
+    fixture.detectChanges();
+    httpMock.expectOne((req) => req.url.includes('api/reports/monthly')).flush(createMockReport());
   });
 });

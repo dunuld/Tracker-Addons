@@ -23,12 +23,17 @@
   <div class="result">
     <h3>Import erfolgreich</h3>
     <dl>
-      <dt>Auszug</dt>
+      <dt>Konto</dt>
       <dd>
-        {{ result()!.statement.iban }} — {{ result()!.statement.month }}/{{
-          result()!.statement.year
-        }}
+        {{ result()!.statement.accountName }} ({{ result()!.statement.iban }})
+        @if (result()!.accountCreated) {
+          <span class="new-account"
+            >Neu angelegt – Name und Farbe unter Einstellungen → Konten anpassen</span
+          >
+        }
       </dd>
+      <dt>Auszug</dt>
+      <dd>{{ result()!.statement.month }}/{{ result()!.statement.year }}</dd>
       <dt>Zeitraum</dt>
       <dd>{{ result()!.periodFrom }} bis {{ result()!.periodTo }}</dd>
       <dt>Buchungen</dt>

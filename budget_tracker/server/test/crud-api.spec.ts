@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type {
+  Account,
   Category,
   MonthlyReport,
   Rule,
@@ -11,7 +12,7 @@ import { createApp } from '../src/app.js';
 import { openDatabase, type Database } from '../src/db/database.js';
 import { DEFAULT_CATEGORY_NAME } from '../src/db/seed.js';
 import { MAX_TREND_MONTHS } from '../src/routes/reports.js';
-import { categoryId, insertTransactions } from './helpers.js';
+import { accountId, categoryId, insertTransactions } from './helpers.js';
 
 let db: Database;
 let app: ReturnType<typeof createApp>;
@@ -328,5 +329,129 @@ describe('api/reports', () => {
     ['/api/reports/trend', { from: '2000-01', to: `${2000 + MAX_TREND_MONTHS / 12}-01` }],
   ])('validiert %s %o', async (url, query) => {
     await api().get(url).query(query).expect(400);
+  });
+});
+
+describe('api/accounts', () => {
+  it('listet Konten mit Anzahl Auszüge und jüngstem Saldo', async () => {
+    insertTransactions(db, [{ date: '2026-09-03', amountCents: -100 }], 'DE01');
+    insertTransactions(db, [{ date: '2026-10-03', amountCents: -100 }], 'DE01');
+    db.prepare('UPDATE statements SET closing_cents = 4200 WHERE month = 10').run();
+    accountId(db, 'DE02');
+
+    const list = (await api().get('/api/accounts').expect(200)).body as Account[];
+    expect(list.map((a) => [a.iban, a.statementCount, a.balanceCents, a.balanceMonth])).toEqual([
+      ['DE01', 2, 4200, '2026-10'],
+      ['DE02', 0, null, null],
+    ]);
+  });
+
+  it('ändert Name, Farbe, Sortierung und Einbeziehung', async () => {
+    const id = accountId(db, 'DE01');
+    const updated = (
+      await api()
+        .patch(`/api/accounts/${id}`)
+        .send({ name: '  Girokonto ', color: '#00ff00', sort: 3, includeInReports: false })
+        .expect(200)
+    ).body as Account;
+    expect(updated).toMatchObject({
+      name: 'Girokonto',
+      color: '#00ff00',
+      sort: 3,
+      includeInReports: false,
+    });
+    const partial = (await api().patch(`/api/accounts/${id}`).send({ name: 'Giro' }).expect(200))
+      .body as Account;
+    expect(partial).toMatchObject({ name: 'Giro', color: '#00ff00', includeInReports: false });
+    await api().get(`/api/accounts/${id}`).expect(200, partial);
+  });
+
+  it('validiert Eingaben', async () => {
+    const id = accountId(db, 'DE01');
+    for (const body of [
+      { name: ' ' },
+      { name: 'x'.repeat(101) },
+      { color: 'blau' },
+      { sort: 1.5 },
+      { includeInReports: 'ja' },
+    ]) {
+      await api().patch(`/api/accounts/${id}`).send(body).expect(400);
+    }
+    await api().patch('/api/accounts/999').send({ name: 'x' }).expect(404);
+    await api().get('/api/accounts/999').expect(404);
+    await api().get('/api/accounts/abc').expect(400);
+  });
+});
+
+describe('Filter nach Konto', () => {
+  let giro: number;
+  let tagesgeld: number;
+  let hidden: number;
+
+  beforeEach(() => {
+    const food = categoryId(db, 'Drogerie');
+    insertTransactions(
+      db,
+      [{ date: '2026-10-02', counterparty: 'REWE', amountCents: -1000, categoryId: food }],
+      'DE01',
+    );
+    insertTransactions(
+      db,
+      [{ date: '2026-10-03', counterparty: 'EDEKA', amountCents: -2000, categoryId: food }],
+      'DE02',
+    );
+    hidden = accountId(db, 'DE03', false);
+    insertTransactions(
+      db,
+      [{ date: '2026-10-04', counterparty: 'ALDI', amountCents: -4000, categoryId: food }],
+      'DE03',
+    );
+    giro = accountId(db, 'DE01');
+    tagesgeld = accountId(db, 'DE02');
+  });
+
+  const foodTotal = (report: MonthlyReport) =>
+    report.categories.find((c) => c.name === 'Drogerie')?.totalCents;
+
+  it('filtert Transaktionen; „Alle Konten“ ohne ausgeblendete Konten', async () => {
+    const all = (await api().get('/api/transactions').expect(200)).body as Transaction[];
+    expect(all.map((t) => [t.counterparty, t.accountId])).toEqual([
+      ['REWE', giro],
+      ['EDEKA', tagesgeld],
+    ]);
+    const one = (await api().get(`/api/transactions?accountId=${tagesgeld}`).expect(200))
+      .body as Transaction[];
+    expect(one.map((t) => t.counterparty)).toEqual(['EDEKA']);
+    const explicit = (await api().get(`/api/transactions?accountId=${hidden}`).expect(200))
+      .body as Transaction[];
+    expect(explicit.map((t) => t.counterparty)).toEqual(['ALDI']);
+    await api().get('/api/transactions?accountId=0').expect(400);
+  });
+
+  it('filtert Monatsübersicht und Trend', async () => {
+    const all = (await api().get('/api/reports/monthly?year=2026&month=10').expect(200))
+      .body as MonthlyReport;
+    expect(foodTotal(all)).toBe(-3000);
+    expect(all.expenseCents).toBe(-3000);
+
+    const one = (
+      await api().get(`/api/reports/monthly?year=2026&month=10&accountId=${giro}`).expect(200)
+    ).body as MonthlyReport;
+    expect(foodTotal(one)).toBe(-1000);
+
+    const hiddenReport = (
+      await api().get(`/api/reports/monthly?year=2026&month=10&accountId=${hidden}`).expect(200)
+    ).body as MonthlyReport;
+    expect(foodTotal(hiddenReport)).toBe(-4000);
+
+    const trend = (
+      await api()
+        .get(`/api/reports/trend?from=2026-10&to=2026-10&accountId=${tagesgeld}`)
+        .expect(200)
+    ).body as TrendReport;
+    expect(trend.months[0]!.totals).toEqual([
+      { categoryId: categoryId(db, 'Drogerie'), totalCents: -2000 },
+    ]);
+    await api().get('/api/reports/monthly?year=2026&month=10&accountId=x').expect(400);
   });
 });

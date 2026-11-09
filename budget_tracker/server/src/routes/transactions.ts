@@ -6,14 +6,19 @@ import type {
   TransactionPatchResult,
 } from '../../../shared/api-types.js';
 import { Categorizer } from '../categorization/categorizer.js';
-import { badRequest, notFound, parseId } from '../http-error.js';
+import { accountScope } from '../accounts.js';
+import { accountIdParam, badRequest, intParam, notFound, parseId } from '../http-error.js';
 import { monthStart, nextMonthStart } from '../month.js';
 import { toRule } from './rules.js';
+
+const TX_SELECT = `SELECT t.*, s.account_id FROM transactions t
+                     JOIN statements s ON s.id = t.statement_id`;
 
 function toTransaction(row: Record<string, unknown>): Transaction {
   return {
     id: Number(row['id']),
     statementId: Number(row['statement_id']),
+    accountId: Number(row['account_id']),
     bookingDate: String(row['booking_date']),
     valueDate: String(row['value_date']),
     type: String(row['type']),
@@ -26,14 +31,6 @@ function toTransaction(row: Record<string, unknown>): Transaction {
   };
 }
 
-/** Optionalen Query-Parameter als Ganzzahl in [min, max] lesen. */
-function intParam(value: unknown, name: string, min: number, max: number): number | undefined {
-  if (value === undefined || value === '') return undefined;
-  const n = Number(value);
-  if (!Number.isInteger(n) || n < min || n > max) throw badRequest(`Ungültiger Parameter ${name}`);
-  return n;
-}
-
 export function transactionsRouter(db: DatabaseSync): Router {
   const router = Router();
   const categorizer = new Categorizer(db);
@@ -44,10 +41,12 @@ export function transactionsRouter(db: DatabaseSync): Router {
     const year = intParam(req.query['year'], 'year', 1990, 2200);
     const month = intParam(req.query['month'], 'month', 1, 12);
     const categoryId = intParam(req.query['categoryId'], 'categoryId', 1, Number.MAX_SAFE_INTEGER);
+    const accountId = accountIdParam(req.query['accountId']);
     const q = typeof req.query['q'] === 'string' ? req.query['q'].trim() : '';
 
-    const conditions: string[] = [];
-    const params: (string | number)[] = [];
+    const scope = accountScope(accountId);
+    const conditions: string[] = [scope.sql];
+    const params: (string | number)[] = [...scope.params];
 
     if (year !== undefined && month !== undefined) {
       conditions.push('t.booking_date >= ? AND t.booking_date < ?');
@@ -64,9 +63,8 @@ export function transactionsRouter(db: DatabaseSync): Router {
       params.push(like, like);
     }
 
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const rows = db
-      .prepare(`SELECT t.* FROM transactions t ${where} ORDER BY t.booking_date, t.id`)
+      .prepare(`${TX_SELECT} WHERE ${conditions.join(' AND ')} ORDER BY t.booking_date, t.id`)
       .all(...params);
     res.json(rows.map(toTransaction));
   });
@@ -78,7 +76,7 @@ export function transactionsRouter(db: DatabaseSync): Router {
     if (!Number.isSafeInteger(categoryId) || categoryId <= 0)
       throw badRequest('categoryId ist erforderlich');
 
-    const txRow = db.prepare('SELECT * FROM transactions WHERE id = ?').get(id);
+    const txRow = db.prepare(`${TX_SELECT} WHERE t.id = ?`).get(id);
     if (!txRow) throw notFound('Transaktion nicht gefunden');
     if (!db.prepare('SELECT id FROM categories WHERE id = ?').get(categoryId)) {
       throw notFound('Kategorie nicht gefunden');
@@ -93,7 +91,7 @@ export function transactionsRouter(db: DatabaseSync): Router {
     ).run(categoryId, id);
 
     const result: TransactionPatchResult = {
-      transaction: toTransaction(db.prepare('SELECT * FROM transactions WHERE id = ?').get(id)!),
+      transaction: toTransaction(db.prepare(`${TX_SELECT} WHERE t.id = ?`).get(id)!),
     };
     if (input.createRule) {
       const ruleId = categorizer.createRuleFromTransaction(tx, categoryId);

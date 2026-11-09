@@ -1,3 +1,5 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { App } from './app';
@@ -7,6 +9,7 @@ describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [RouterTestingModule, App],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
   });
 
@@ -77,5 +80,14 @@ describe('App', () => {
       const fixture = TestBed.createComponent(App);
       expect(fixture.componentInstance.themeService).toBe(TestBed.inject(ThemeService));
     });
+  });
+
+  it('lädt die Konten beim Start und ignoriert Ladefehler', async () => {
+    const fixture = TestBed.createComponent(App);
+    const httpMock = TestBed.inject(HttpTestingController);
+    httpMock.expectOne('api/accounts').error(new ProgressEvent('error'));
+    await fixture.whenStable();
+    expect(fixture.componentInstance).toBeTruthy();
+    httpMock.verify();
   });
 });

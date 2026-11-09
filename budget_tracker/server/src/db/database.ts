@@ -1,12 +1,13 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { defaultAccountColor, defaultAccountName } from '../accounts.js';
 import { ensureDefaultCategory, seedDefaults } from './seed.js';
 
 /** Kapselt den SQLite-Treiber (node:sqlite); bei Bedarf gegen better-sqlite3 austauschbar. */
 export type Database = DatabaseSync;
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const schemaSql = (): string => readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 
@@ -38,15 +39,81 @@ function migrate(db: Database): void {
       `Datenbank-Schema v${version} ist neuer als diese Version des Addons (v${SCHEMA_VERSION}).`,
     );
   }
-  transaction(db, () => {
-    if (version < 1) {
-      db.exec(schemaSql());
-      seedDefaults(db);
-    }
-    // Künftige Migrationen: if (version < 2) { ... }
-    ensureDefaultCategory(db);
-    db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  // Tabellen-Neuaufbau (v2) nur ohne Fremdschlüsselprüfung möglich, sonst löscht DROP TABLE
+  // per CASCADE alle Buchungen. Das PRAGMA wirkt nicht innerhalb einer Transaktion.
+  const rebuild = version >= 1 && version < 2;
+  if (rebuild) db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    transaction(db, () => {
+      if (version < 1) {
+        db.exec(schemaSql());
+        seedDefaults(db);
+      } else if (version < 2) {
+        migrateToV2(db);
+      }
+      // Künftige Migrationen: if (version < 3) { ... }
+      ensureDefaultCategory(db);
+      db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+    });
+  } finally {
+    if (rebuild) db.exec('PRAGMA foreign_keys = ON');
+  }
+}
+
+/**
+ * v1 → v2: Konten einführen. Aus jeder IBAN der vorhandenen Auszüge wird ein Konto;
+ * `statements.iban`/`bank` werden durch `statements.account_id` ersetzt.
+ */
+function migrateToV2(db: Database): void {
+  db.exec(`
+    CREATE TABLE accounts (
+      id                 INTEGER PRIMARY KEY,
+      iban               TEXT    NOT NULL UNIQUE,
+      bank               TEXT    NOT NULL,
+      name               TEXT    NOT NULL CHECK (length(trim(name)) > 0),
+      color              TEXT    NOT NULL DEFAULT '#2196f3'
+                                 CHECK (color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]'),
+      sort               INTEGER NOT NULL DEFAULT 0,
+      include_in_reports INTEGER NOT NULL DEFAULT 1 CHECK (include_in_reports IN (0, 1))
+    )`);
+
+  const ibans = db
+    .prepare('SELECT iban, MIN(bank) AS bank FROM statements GROUP BY iban ORDER BY MIN(id)')
+    .all();
+  const insert = db.prepare(
+    'INSERT INTO accounts (iban, bank, name, color, sort) VALUES (?, ?, ?, ?, ?)',
+  );
+  ibans.forEach((row, index) => {
+    const iban = String(row['iban']);
+    const bank = String(row['bank']);
+    insert.run(iban, bank, defaultAccountName(bank, iban), defaultAccountColor(index), index);
   });
+
+  db.exec(`
+    CREATE TABLE statements_v2 (
+      id            INTEGER PRIMARY KEY,
+      account_id    INTEGER NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+      year          INTEGER NOT NULL CHECK (year BETWEEN 1990 AND 2200),
+      month         INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+      opening_cents INTEGER NOT NULL,
+      closing_cents INTEGER NOT NULL,
+      file_hash     TEXT    NOT NULL UNIQUE,
+      file_name     TEXT    NOT NULL,
+      imported_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      UNIQUE (account_id, year, month)
+    );
+    INSERT INTO statements_v2 (id, account_id, year, month, opening_cents, closing_cents,
+                               file_hash, file_name, imported_at)
+      SELECT s.id, a.id, s.year, s.month, s.opening_cents, s.closing_cents,
+             s.file_hash, s.file_name, s.imported_at
+        FROM statements s JOIN accounts a ON a.iban = s.iban;
+    DROP TABLE statements;
+    ALTER TABLE statements_v2 RENAME TO statements;
+  `);
+
+  if (db.prepare('PRAGMA foreign_key_check').all().length) {
+    throw new Error('Migration auf Schema v2 fehlgeschlagen: verwaiste Fremdschlüssel');
+  }
 }
 
 /** Führt `fn` in einer Transaktion aus; bei Fehlern wird zurückgerollt. Nicht verschachteln. */

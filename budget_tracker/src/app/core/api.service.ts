@@ -1,6 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type {
+  Account,
+  AccountInput,
   Category,
   CategoryInput,
   ImportResult,
@@ -19,6 +21,17 @@ import type {
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
+
+  // Accounts
+  listAccounts() {
+    return this.http.get<Account[]>('api/accounts');
+  }
+  updateAccount(id: number, input: AccountInput) {
+    return this.http.patch<Account>(`api/accounts/${id}`, input);
+  }
+  deleteAccount(id: number) {
+    return this.http.delete<void>(`api/accounts/${id}`);
+  }
 
   // Statements
   listStatements() {
@@ -67,6 +80,7 @@ export class ApiService {
   // Transactions
   listTransactions(query: TransactionQuery) {
     const params: Record<string, string> = {};
+    if (query.accountId) params['accountId'] = String(query.accountId);
     if (query.year) params['year'] = String(query.year);
     if (query.month) params['month'] = String(query.month);
     if (query.categoryId) params['categoryId'] = String(query.categoryId);
@@ -78,12 +92,19 @@ export class ApiService {
   }
 
   // Reports
-  monthlyReport(year: number, month: number) {
+  monthlyReport(year: number, month: number, accountId?: number | null) {
     return this.http.get<MonthlyReport>('api/reports/monthly', {
-      params: { year: String(year), month: String(month) },
+      params: { year: String(year), month: String(month), ...accountParam(accountId) },
     });
   }
-  trendReport(from: string, to: string) {
-    return this.http.get<TrendReport>('api/reports/trend', { params: { from, to } });
+  trendReport(from: string, to: string, accountId?: number | null) {
+    return this.http.get<TrendReport>('api/reports/trend', {
+      params: { from, to, ...accountParam(accountId) },
+    });
   }
+}
+
+/** Ohne Konto (`null`/`undefined`) = „Alle Konten“ → kein Parameter. */
+function accountParam(accountId: number | null | undefined): Record<string, string> {
+  return accountId ? { accountId: String(accountId) } : {};
 }

@@ -1,12 +1,14 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import request from 'supertest';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp, ipFilter, normalizeIp } from '../src/app.js';
 import { INGRESS_PROXY_IP, loadConfig } from '../src/config.js';
 import { openDatabase, SCHEMA_VERSION, type Database } from '../src/db/database.js';
 import { DEFAULT_CATEGORY_NAME, SEED_CATEGORIES } from '../src/db/seed.js';
+import { accountId, insertTransactions } from './helpers.js';
 
 const tempDirs: string[] = [];
 const openDbs: Database[] = [];
@@ -83,6 +85,48 @@ describe('Datenbank', () => {
     );
   });
 
+  it('migriert Schema v1: legt je IBAN ein Konto an und behält Auszüge und Buchungen', () => {
+    const file = join(tempDir(), 'budget.db');
+    const v1 = new DatabaseSync(file);
+    v1.exec(readFileSync(new URL('./fixtures/schema-v1.sql', import.meta.url), 'utf8'));
+    v1.exec(`
+      INSERT INTO categories (id, name, kind, is_default) VALUES (1, 'Sonstiges', 'expense', 1);
+      INSERT INTO statements (id, bank, iban, year, month, opening_cents, closing_cents, file_hash, file_name)
+      VALUES (1, 'ING', 'DE00111122223333444455', 2026, 9, 0, -500, 'h1', 'a.pdf'),
+             (2, 'ING', 'DE00999988887777666655', 2026, 9, 1000, 900, 'h2', 'b.pdf'),
+             (3, 'ING', 'DE00111122223333444455', 2026, 10, -500, -700, 'h3', 'c.pdf');
+      INSERT INTO transactions (statement_id, booking_date, value_date, amount_cents, category_id)
+      VALUES (1, '2026-09-01', '2026-09-01', -500, 1), (2, '2026-09-02', '2026-09-02', -100, 1),
+             (3, '2026-10-01', '2026-10-01', -200, 1);
+      PRAGMA user_version = 1;
+    `);
+    v1.close();
+
+    const db = openDatabase(file);
+    openDbs.push(db);
+    expect(db.prepare('PRAGMA user_version').get()?.['user_version']).toBe(SCHEMA_VERSION);
+    expect(db.prepare('PRAGMA foreign_keys').get()?.['foreign_keys']).toBe(1);
+    expect(db.prepare('SELECT iban, bank, name, sort FROM accounts ORDER BY id').all()).toEqual([
+      { iban: 'DE00111122223333444455', bank: 'ING', name: 'ING ••4455', sort: 0 },
+      { iban: 'DE00999988887777666655', bank: 'ING', name: 'ING ••6655', sort: 1 },
+    ]);
+    expect(
+      db
+        .prepare(
+          'SELECT s.id, a.iban, s.file_hash FROM statements s JOIN accounts a ON a.id = s.account_id ORDER BY s.id',
+        )
+        .all(),
+    ).toEqual([
+      { id: 1, iban: 'DE00111122223333444455', file_hash: 'h1' },
+      { id: 2, iban: 'DE00999988887777666655', file_hash: 'h2' },
+      { id: 3, iban: 'DE00111122223333444455', file_hash: 'h3' },
+    ]);
+    expect(Number(db.prepare('SELECT COUNT(*) AS n FROM transactions').get()?.['n'])).toBe(3);
+    // Fremdschlüssel greifen weiterhin auf die neu aufgebaute Tabelle
+    db.prepare('DELETE FROM statements WHERE id = 1').run();
+    expect(Number(db.prepare('SELECT COUNT(*) AS n FROM transactions').get()?.['n'])).toBe(2);
+  });
+
   it('lehnt ein neueres Schema ab', () => {
     const file = join(tempDir(), 'budget.db');
     const db = openDatabase(file);
@@ -106,10 +150,10 @@ describe('Datenbank', () => {
       .get(streamingId!)?.['id'];
     const { lastInsertRowid: statementId } = db
       .prepare(
-        `INSERT INTO statements (bank, iban, year, month, opening_cents, closing_cents, file_hash, file_name)
-         VALUES ('ING', 'DE00', 2026, 10, 0, -1299, 'hash', 'a.pdf')`,
+        `INSERT INTO statements (account_id, year, month, opening_cents, closing_cents, file_hash, file_name)
+         VALUES (?, 2026, 10, 0, -1299, 'hash', 'a.pdf')`,
       )
-      .run();
+      .run(accountId(db, 'DE00'));
     db.prepare(
       `INSERT INTO transactions (statement_id, booking_date, value_date, type, counterparty, purpose,
                                  amount_cents, category_id, category_source, rule_id)
@@ -132,15 +176,26 @@ describe('Datenbank', () => {
     expect(Number(db.prepare('SELECT COUNT(*) AS n FROM transactions').get()?.['n'])).toBe(0);
   });
 
-  it('verhindert doppelte Auszüge (IBAN + Monat, Datei-Hash)', () => {
+  it('verhindert doppelte Auszüge (Konto + Monat, Datei-Hash)', () => {
     const db = memoryDb();
     const insert = db.prepare(
-      `INSERT INTO statements (bank, iban, year, month, opening_cents, closing_cents, file_hash, file_name)
-       VALUES ('ING', ?, 2026, 10, 0, 0, ?, 'a.pdf')`,
+      `INSERT INTO statements (account_id, year, month, opening_cents, closing_cents, file_hash, file_name)
+       VALUES (?, 2026, 10, 0, 0, ?, 'a.pdf')`,
     );
-    insert.run('DE01', 'h1');
-    expect(() => insert.run('DE01', 'h2')).toThrow(/UNIQUE/);
-    expect(() => insert.run('DE02', 'h1')).toThrow(/UNIQUE/);
+    const a1 = accountId(db, 'DE01');
+    const a2 = accountId(db, 'DE02');
+    insert.run(a1, 'h1');
+    expect(() => insert.run(a1, 'h2')).toThrow(/UNIQUE/);
+    expect(() => insert.run(a2, 'h1')).toThrow(/UNIQUE/);
+  });
+
+  it('löscht mit einem Konto alle Auszüge und Buchungen', () => {
+    const db = memoryDb();
+    insertTransactions(db, [{ date: '2026-10-01', amountCents: -100 }], 'DE01');
+    insertTransactions(db, [{ date: '2026-10-01', amountCents: -200 }], 'DE02');
+    db.prepare('DELETE FROM accounts WHERE iban = ?').run('DE01');
+    const rows = db.prepare('SELECT amount_cents FROM transactions').all();
+    expect(rows).toEqual([{ amount_cents: -200 }]);
   });
 });
 

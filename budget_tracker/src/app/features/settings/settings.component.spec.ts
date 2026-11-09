@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import SettingsComponent from './settings.component';
-import type { Category, Rule, Statement } from '../../../../shared/api-types';
+import type { Account, Category, Rule, Statement } from '../../../../shared/api-types';
 
 describe('SettingsComponent', () => {
   let httpMock: HttpTestingController;
@@ -35,6 +35,8 @@ describe('SettingsComponent', () => {
   const createMockStatements = (): Statement[] => [
     {
       id: 1,
+      accountId: 1,
+      accountName: 'Girokonto',
       bank: 'TestBank',
       iban: 'DE12345678901234567890',
       year: 2024,
@@ -56,6 +58,8 @@ describe('SettingsComponent', () => {
   });
 
   afterEach(() => {
+    // Die Kontenliste (AccountService) wird zusätzlich geladen; in diesen Tests nicht relevant.
+    httpMock.match((req) => req.url.includes('api/accounts')).forEach((req) => req.flush([]));
     httpMock.verify();
   });
 
@@ -78,15 +82,16 @@ describe('SettingsComponent', () => {
     httpMock.expectOne((req) => req.url.includes('api/statements')).flush([]);
   });
 
-  it('should display all three tabs', () => {
+  it('should display all four tabs', () => {
     const fixture = TestBed.createComponent(SettingsComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     const tabs = compiled.querySelectorAll('.tab');
-    expect(tabs.length).toBe(3);
+    expect(tabs.length).toBe(4);
     expect(tabs[0]?.textContent).toContain('Kategorien');
     expect(tabs[1]?.textContent).toContain('Regeln');
-    expect(tabs[2]?.textContent).toContain('Auszüge');
+    expect(tabs[2]?.textContent).toContain('Konten');
+    expect(tabs[3]?.textContent).toContain('Auszüge');
     httpMock.expectOne((req) => req.url.includes('api/categories')).flush([]);
     httpMock.expectOne((req) => req.url.includes('api/rules')).flush([]);
     httpMock.expectOne((req) => req.url.includes('api/statements')).flush([]);
@@ -591,6 +596,175 @@ describe('SettingsComponent', () => {
         else req.flush([]);
       }
       expect(fixture.componentInstance.errorMsg()).toBe(message);
+    });
+  });
+
+  describe('Konten', () => {
+    const accounts = (): Account[] => [
+      {
+        id: 1,
+        iban: 'DE12345678901234567890',
+        bank: 'ING',
+        name: 'ING ••7890',
+        color: '#2196f3',
+        sort: 0,
+        includeInReports: true,
+        statementCount: 2,
+        balanceCents: 123456,
+        balanceMonth: '2026-10',
+      },
+    ];
+
+    async function openAccountsTab() {
+      const fixture = TestBed.createComponent(SettingsComponent);
+      fixture.detectChanges();
+      httpMock.expectOne((req) => req.url.includes('api/categories')).flush([]);
+      httpMock.expectOne((req) => req.url.includes('api/rules')).flush([]);
+      httpMock.expectOne((req) => req.url.includes('api/statements')).flush([]);
+      httpMock.expectOne('api/accounts').flush(accounts());
+      await fixture.whenStable();
+      fixture.componentInstance.activeTab.set('accounts');
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    it('zeigt Konten mit Saldo und Anzahl Auszüge', async () => {
+      const fixture = await openAccountsTab();
+      const row = (fixture.nativeElement as HTMLElement).querySelector('tbody tr')!;
+      expect((row.querySelector('.account-name') as HTMLInputElement).value).toBe('ING ••7890');
+      expect(row.textContent).toContain('DE12345678901234567890');
+      expect(row.textContent).toContain('1.234,56');
+      expect(row.textContent).toContain('Stand');
+    });
+
+    it('benennt ein Konto um und ignoriert leere Namen', async () => {
+      const fixture = await openAccountsTab();
+      const input = (fixture.nativeElement as HTMLElement).querySelector(
+        '.account-name',
+      ) as HTMLInputElement;
+
+      input.value = '  ';
+      input.dispatchEvent(new Event('change'));
+      expect(input.value).toBe('ING ••7890');
+
+      input.value = 'Girokonto';
+      input.dispatchEvent(new Event('change'));
+      const req = httpMock.expectOne('api/accounts/1');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ name: 'Girokonto' });
+      req.flush({ ...accounts()[0], name: 'Girokonto' });
+      httpMock.expectOne((r) => r.url.includes('api/statements')).flush([]);
+      expect(fixture.componentInstance.accountList()[0]!.name).toBe('Girokonto');
+    });
+
+    it('schaltet „In Alle Konten“ um', async () => {
+      const fixture = await openAccountsTab();
+      const checkbox = (fixture.nativeElement as HTMLElement).querySelector(
+        'input[type=checkbox]',
+      ) as HTMLInputElement;
+      checkbox.checked = false;
+      checkbox.dispatchEvent(new Event('change'));
+      const req = httpMock.expectOne('api/accounts/1');
+      expect(req.request.body).toEqual({ includeInReports: false });
+      req.flush({ ...accounts()[0], includeInReports: false });
+      expect(fixture.componentInstance.accountList()[0]!.includeInReports).toBe(false);
+    });
+
+    it('löscht ein Konto nach Bestätigung und lädt Konten und Auszüge neu', async () => {
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const fixture = await openAccountsTab();
+      (
+        (fixture.nativeElement as HTMLElement).querySelector('tbody .btn-danger') as HTMLElement
+      ).click();
+      expect(confirmSpy.mock.calls[0]![0]).toContain('2 Auszüge');
+      const req = httpMock.expectOne('api/accounts/1');
+      expect(req.request.method).toBe('DELETE');
+      req.flush(null);
+      httpMock.expectOne('api/accounts').flush([]);
+      httpMock.expectOne((r) => r.url.includes('api/statements')).flush([]);
+      confirmSpy.mockRestore();
+    });
+
+    it('ändert die Farbe und lässt einen unveränderten Namen unangetastet', async () => {
+      const fixture = await openAccountsTab();
+      const el = fixture.nativeElement as HTMLElement;
+      const name = el.querySelector('.account-name') as HTMLInputElement;
+      name.dispatchEvent(new Event('change'));
+
+      const color = el.querySelector('input[type=color]') as HTMLInputElement;
+      color.value = '#00ff00';
+      color.dispatchEvent(new Event('change'));
+      const req = httpMock.expectOne('api/accounts/1');
+      expect(req.request.body).toEqual({ color: '#00ff00' });
+      req.flush({ ...accounts()[0], color: '#00ff00' });
+      expect(fixture.componentInstance.accountList()[0]!.color).toBe('#00ff00');
+    });
+
+    it('zeigt Fehler beim Ändern und Löschen an', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const fixture = await openAccountsTab();
+      const component = fixture.componentInstance;
+
+      component.updateAccount(accounts()[0]!, { name: 'X' });
+      httpMock
+        .expectOne('api/accounts/1')
+        .flush({ error: 'Name ist erforderlich' }, { status: 400, statusText: 'Bad Request' });
+      expect(component.errorMsg()).toBe('Name ist erforderlich');
+
+      component.updateAccount(accounts()[0]!, { color: '#000000' });
+      httpMock.expectOne('api/accounts/1').error(new ProgressEvent('error'));
+      expect(component.errorMsg()).toBe('Konto konnte nicht geändert werden');
+
+      component.deleteAccount(accounts()[0]!);
+      httpMock.expectOne('api/accounts/1').error(new ProgressEvent('error'));
+      expect(component.errorMsg()).toBe('Fehler beim Löschen');
+      vi.restoreAllMocks();
+    });
+
+    it('löscht nichts, wenn das Löschen abgebrochen wird', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      const fixture = await openAccountsTab();
+      fixture.componentInstance.deleteAccount(accounts()[0]!);
+      httpMock.expectNone('api/accounts/1');
+      vi.restoreAllMocks();
+    });
+
+    it('meldet Ladefehler und zeigt ohne Konten einen Hinweis', async () => {
+      const fixture = TestBed.createComponent(SettingsComponent);
+      fixture.detectChanges();
+      httpMock.expectOne((req) => req.url.includes('api/categories')).flush([]);
+      httpMock.expectOne((req) => req.url.includes('api/rules')).flush([]);
+      httpMock.expectOne((req) => req.url.includes('api/statements')).flush([]);
+      httpMock.expectOne('api/accounts').error(new ProgressEvent('error'));
+      await fixture.whenStable();
+      fixture.componentInstance.activeTab.set('accounts');
+      fixture.detectChanges();
+      expect(fixture.componentInstance.errorMsg()).toBe('Konten konnten nicht geladen werden');
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Noch keine Konten');
+    });
+
+    it('zeigt „—“ für Konten ohne Auszug und schaltet über die Tab-Leiste um', async () => {
+      const fixture = TestBed.createComponent(SettingsComponent);
+      fixture.detectChanges();
+      httpMock.expectOne((req) => req.url.includes('api/categories')).flush([]);
+      httpMock.expectOne((req) => req.url.includes('api/rules')).flush([]);
+      httpMock.expectOne((req) => req.url.includes('api/statements')).flush([]);
+      httpMock
+        .expectOne('api/accounts')
+        .flush([{ ...accounts()[0], statementCount: 0, balanceCents: null, balanceMonth: null }]);
+      await fixture.whenStable();
+      const el = fixture.nativeElement as HTMLElement;
+      (
+        [...el.querySelectorAll('.tab')].find((t) =>
+          t.textContent?.includes('Konten'),
+        ) as HTMLElement
+      ).click();
+      fixture.detectChanges();
+      expect(fixture.componentInstance.activeTab()).toBe('accounts');
+      expect(el.querySelector('tbody tr')?.textContent).toContain('—');
+      expect(
+        fixture.componentInstance.balanceLabel(fixture.componentInstance.accountList()[0]!),
+      ).toBe('');
     });
   });
 });

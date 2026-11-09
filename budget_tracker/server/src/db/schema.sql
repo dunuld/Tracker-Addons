@@ -1,4 +1,4 @@
--- Schema-Version 1 (PRAGMA user_version). Beträge in Integer-Cent, Daten als ISO-Text.
+-- Schema-Version 2 (PRAGMA user_version). Beträge in Integer-Cent, Daten als ISO-Text.
 
 CREATE TABLE categories (
   id         INTEGER PRIMARY KEY,
@@ -24,10 +24,22 @@ CREATE TABLE rules (
 CREATE INDEX rules_by_priority ON rules (priority, id);
 CREATE INDEX rules_by_category ON rules (category_id);
 
+-- Ein Konto je IBAN; wird beim ersten Import eines Auszugs automatisch angelegt.
+CREATE TABLE accounts (
+  id                 INTEGER PRIMARY KEY,
+  iban               TEXT    NOT NULL UNIQUE,
+  bank               TEXT    NOT NULL,
+  name               TEXT    NOT NULL CHECK (length(trim(name)) > 0),
+  color              TEXT    NOT NULL DEFAULT '#2196f3'
+                             CHECK (color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]'),
+  sort               INTEGER NOT NULL DEFAULT 0,
+  -- 0 = nur sichtbar, wenn das Konto ausdrücklich ausgewählt ist (nicht unter "Alle Konten")
+  include_in_reports INTEGER NOT NULL DEFAULT 1 CHECK (include_in_reports IN (0, 1))
+);
+
 CREATE TABLE statements (
   id            INTEGER PRIMARY KEY,
-  bank          TEXT    NOT NULL,
-  iban          TEXT    NOT NULL,
+  account_id    INTEGER NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
   year          INTEGER NOT NULL CHECK (year BETWEEN 1990 AND 2200),
   month         INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
   opening_cents INTEGER NOT NULL,
@@ -35,7 +47,7 @@ CREATE TABLE statements (
   file_hash     TEXT    NOT NULL UNIQUE,
   file_name     TEXT    NOT NULL,
   imported_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  UNIQUE (iban, year, month)
+  UNIQUE (account_id, year, month)
 );
 
 CREATE TABLE transactions (

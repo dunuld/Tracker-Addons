@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { ImportResult, Statement } from '../../../shared/api-types.js';
+import { defaultAccountColor, defaultAccountName } from '../accounts.js';
 import type { CategoryAssignment } from '../categorization/categorizer.js';
 import { transaction, type Database } from '../db/database.js';
 import { HttpError, badRequest, notFound } from '../http-error.js';
@@ -33,12 +34,15 @@ const euro = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR'
 export const formatCents = (cents: number): string => euro.format(cents / 100);
 
 const STATEMENT_SELECT = `
-  SELECT s.*, (SELECT COUNT(*) FROM transactions t WHERE t.statement_id = s.id) AS transaction_count
-    FROM statements s`;
+  SELECT s.*, a.iban, a.bank, a.name AS account_name,
+         (SELECT COUNT(*) FROM transactions t WHERE t.statement_id = s.id) AS transaction_count
+    FROM statements s JOIN accounts a ON a.id = s.account_id`;
 
 function toStatement(row: Record<string, unknown>): Statement {
   return {
     id: Number(row['id']),
+    accountId: Number(row['account_id']),
+    accountName: String(row['account_name']),
     bank: String(row['bank']),
     iban: String(row['iban']),
     year: Number(row['year']),
@@ -121,7 +125,7 @@ export class ImportService {
 
     const duplicateRows = this.db
       .prepare(
-        `${STATEMENT_SELECT} WHERE s.file_hash = ? OR (s.iban = ? AND s.year = ? AND s.month = ?)`,
+        `${STATEMENT_SELECT} WHERE s.file_hash = ? OR (a.iban = ? AND s.year = ? AND s.month = ?)`,
       )
       .all(fileHash, parsed.iban, parsed.year, parsed.month);
     const duplicates = duplicateRows.map(toStatement);
@@ -151,18 +155,37 @@ export class ImportService {
     const assignments = parsed.transactions.map((tx) => this.categorize(tx));
     const uncategorizedCount = assignments.filter((a) => a.source === 'default').length;
 
+    let accountCreated = false;
     const statementId = transaction(this.db, () => {
       const remove = this.db.prepare('DELETE FROM statements WHERE id = ?');
       for (const duplicate of duplicates) remove.run(duplicate.id);
 
+      let accountId = this.db.prepare('SELECT id FROM accounts WHERE iban = ?').get(parsed.iban)?.[
+        'id'
+      ];
+      if (accountId === undefined) {
+        const { count, maxSort } = this.db
+          .prepare('SELECT COUNT(*) AS count, COALESCE(MAX(sort), -1) AS maxSort FROM accounts')
+          .get() as { count: number; maxSort: number };
+        accountId = this.db
+          .prepare('INSERT INTO accounts (iban, bank, name, color, sort) VALUES (?, ?, ?, ?, ?)')
+          .run(
+            parsed.iban,
+            parsed.bank,
+            defaultAccountName(parsed.bank, parsed.iban),
+            defaultAccountColor(Number(count)),
+            Number(maxSort) + 1,
+          ).lastInsertRowid;
+        accountCreated = true;
+      }
+
       const { lastInsertRowid } = this.db
         .prepare(
-          `INSERT INTO statements (bank, iban, year, month, opening_cents, closing_cents, file_hash, file_name)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO statements (account_id, year, month, opening_cents, closing_cents, file_hash, file_name)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
-          parsed.bank,
-          parsed.iban,
+          Number(accountId),
           parsed.year,
           parsed.month,
           parsed.openingCents,
@@ -202,6 +225,7 @@ export class ImportService {
       periodFrom: parsed.periodFrom,
       periodTo: parsed.periodTo,
       transactionCount: parsed.transactions.length,
+      accountCreated,
       uncategorizedCount,
       sumCents,
       balanceOk,
@@ -211,7 +235,7 @@ export class ImportService {
 
   listStatements(): Statement[] {
     return this.db
-      .prepare(`${STATEMENT_SELECT} ORDER BY s.year DESC, s.month DESC, s.iban`)
+      .prepare(`${STATEMENT_SELECT} ORDER BY s.year DESC, s.month DESC, a.sort, a.id`)
       .all()
       .map(toStatement);
   }
@@ -228,6 +252,18 @@ export class ImportService {
     if (!row) throw notFound('Kontoauszug nicht gefunden');
     this.db.prepare('DELETE FROM statements WHERE id = ?').run(id);
     this.deleteFile(String(row['file_hash']));
+  }
+
+  /** Löscht ein Konto inkl. aller Auszüge, Buchungen (ON DELETE CASCADE) und PDF-Dateien. */
+  deleteAccount(id: number): void {
+    if (!this.db.prepare('SELECT id FROM accounts WHERE id = ?').get(id))
+      throw notFound('Konto nicht gefunden');
+    const hashes = this.db
+      .prepare('SELECT file_hash FROM statements WHERE account_id = ?')
+      .all(id)
+      .map((row) => String(row['file_hash']));
+    this.db.prepare('DELETE FROM accounts WHERE id = ?').run(id);
+    for (const hash of hashes) this.deleteFile(hash);
   }
 
   private defaultCategorize(): Categorize {

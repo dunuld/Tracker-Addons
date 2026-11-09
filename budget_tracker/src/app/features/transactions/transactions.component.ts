@@ -1,19 +1,22 @@
 import { Component, signal, computed, effect, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
+import { AccountService } from '../../core/account.service';
 import { apiErrorMessage } from '../../core/api-error';
 import { ApiService } from '../../core/api.service';
 import { formatEuro, formatMonthYear } from '../../core/format';
+import AccountSelectComponent from '../../shared/account-select.component';
 import type { Category, Transaction, TransactionQuery } from '../../../../shared/api-types';
 
 @Component({
   selector: 'app-transactions',
-  imports: [DatePipe],
+  imports: [DatePipe, AccountSelectComponent],
   templateUrl: './transactions.component.html',
   styleUrl: './transactions.component.css',
 })
 export default class TransactionsComponent {
   private api = inject(ApiService);
+  readonly accounts = inject(AccountService);
 
   transactions = signal<Transaction[]>([]);
   categories = signal<Category[]>([]);
@@ -27,7 +30,11 @@ export default class TransactionsComponent {
 
   monthLabel = computed(() => formatMonthYear(this.year(), this.month()));
 
+  /** Konto-Spalte nur bei „Alle Konten“ und mehreren Konten */
+  showAccount = computed(() => this.accounts.hasMultiple() && this.accounts.selectedId() === null);
+
   query = computed<TransactionQuery>(() => ({
+    accountId: this.accounts.selectedId() ?? undefined,
     year: this.year(),
     month: this.month(),
     categoryId: this.categoryId() ?? undefined,

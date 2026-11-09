@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { AccountService } from './core/account.service.js';
 import { ThemeService } from './core/theme.service.js';
 
 @Component({
@@ -10,6 +11,13 @@ import { ThemeService } from './core/theme.service.js';
 })
 export class App {
   readonly themeService = inject(ThemeService);
+
+  constructor() {
+    // Konten einmal beim Start laden; Fehler zeigen die Seiten selbst an.
+    inject(AccountService)
+      .refresh()
+      .catch(() => undefined);
+  }
 
   themeLabel(): string {
     const m = this.themeService.mode();

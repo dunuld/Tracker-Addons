@@ -48,8 +48,36 @@ export interface RuleInput {
   priority?: number;
 }
 
+export interface Account {
+  id: number;
+  iban: string;
+  bank: string;
+  /** Anzeigename, z. B. „Girokonto“; Standard: `<Bank> ••<letzte 4 Stellen der IBAN>` */
+  name: string;
+  /** Hex-Farbe, z. B. `#2196f3` */
+  color: string;
+  sort: number;
+  /** false = nur sichtbar, wenn das Konto ausdrücklich ausgewählt ist (nicht unter „Alle Konten“) */
+  includeInReports: boolean;
+  statementCount: number;
+  /** Neuer Saldo des jüngsten Auszugs; `null` ohne Auszüge */
+  balanceCents: number | null;
+  /** Monat des jüngsten Auszugs (`YYYY-MM`); `null` ohne Auszüge */
+  balanceMonth: string | null;
+}
+
+export interface AccountInput {
+  name?: string;
+  color?: string;
+  sort?: number;
+  includeInReports?: boolean;
+}
+
 export interface Statement {
   id: number;
+  accountId: number;
+  /** Anzeigename des Kontos */
+  accountName: string;
   bank: string;
   iban: string;
   year: number;
@@ -66,6 +94,7 @@ export type CategorySource = 'rule' | 'manual' | 'default';
 export interface Transaction {
   id: number;
   statementId: number;
+  accountId: number;
   bookingDate: string;
   valueDate: string;
   type: string;
@@ -78,6 +107,8 @@ export interface Transaction {
 }
 
 export interface TransactionQuery {
+  /** Ohne Angabe: alle Konten mit `includeInReports` */
+  accountId?: number;
   year?: number;
   month?: number;
   categoryId?: number;
@@ -101,6 +132,8 @@ export interface ImportResult {
   periodFrom: string;
   periodTo: string;
   transactionCount: number;
+  /** true, wenn das Konto bei diesem Import neu angelegt wurde */
+  accountCreated: boolean;
   uncategorizedCount: number;
   /** Summe aller Buchungen */
   sumCents: number;

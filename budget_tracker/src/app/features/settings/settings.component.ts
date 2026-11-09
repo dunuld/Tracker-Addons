@@ -1,9 +1,16 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, signal, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AccountService } from '../../core/account.service.js';
 import { ApiService } from '../../core/api.service.js';
-import { formatDate as fmtDate } from '../../core/format.js';
+import {
+  formatDate as fmtDate,
+  formatEuro as fmtEuro,
+  formatMonthYear as fmtMonthYear,
+} from '../../core/format.js';
 import type {
+  Account,
+  AccountInput,
   Category,
   CategoryInput,
   Rule,
@@ -29,6 +36,13 @@ import type { CategoryKind, RuleField, RuleMatchType } from '../../../../shared/
       </button>
       <button class="tab" [class.active]="activeTab() === 'rules'" (click)="activeTab.set('rules')">
         Regeln
+      </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'accounts'"
+        (click)="activeTab.set('accounts')"
+      >
+        Konten
       </button>
       <button
         class="tab"
@@ -157,6 +171,83 @@ import type { CategoryKind, RuleField, RuleMatchType } from '../../../../shared/
       </div>
     }
 
+    @if (activeTab() === 'accounts') {
+      <div class="tab-content">
+        @if (accountList().length > 0) {
+          <p class="hint">
+            Konten werden beim Import eines Auszugs automatisch anhand der IBAN angelegt. Ist „In
+            Alle Konten“ deaktiviert, erscheint das Konto nur, wenn es ausdrücklich ausgewählt ist.
+          </p>
+          <div class="bt-card table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Farbe</th>
+                  <th>Name</th>
+                  <th>IBAN</th>
+                  <th class="text-right">Saldo</th>
+                  <th class="text-right">Auszüge</th>
+                  <th>In „Alle Konten“</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (a of accountList(); track a.id) {
+                  <tr>
+                    <td>
+                      <input
+                        type="color"
+                        class="color-input"
+                        [value]="a.color"
+                        (change)="updateAccount(a, { color: $any($event.target).value })"
+                        [attr.aria-label]="'Farbe von ' + a.name"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        class="input account-name"
+                        [value]="a.name"
+                        maxlength="100"
+                        (change)="renameAccount(a, $any($event.target))"
+                        [attr.aria-label]="'Name von ' + a.name"
+                      />
+                    </td>
+                    <td>
+                      <code>{{ a.iban }}</code>
+                    </td>
+                    <td class="text-right">
+                      @if (a.balanceCents !== null) {
+                        {{ formatEuro(a.balanceCents) }}
+                        <span class="muted">{{ balanceLabel(a) }}</span>
+                      } @else {
+                        —
+                      }
+                    </td>
+                    <td class="text-right">{{ a.statementCount }}</td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        [checked]="a.includeInReports"
+                        (change)="
+                          updateAccount(a, { includeInReports: $any($event.target).checked })
+                        "
+                        [attr.aria-label]="a.name + ' in Alle Konten einbeziehen'"
+                      />
+                    </td>
+                    <td>
+                      <button class="btn-danger" (click)="deleteAccount(a)">Löschen</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <p class="empty">Noch keine Konten – lade einen Kontoauszug hoch.</p>
+        }
+      </div>
+    }
+
     @if (activeTab() === 'statements') {
       <div class="tab-content">
         @if (statements().length > 0) {
@@ -165,7 +256,7 @@ import type { CategoryKind, RuleField, RuleMatchType } from '../../../../shared/
               <thead>
                 <tr>
                   <th>Monat</th>
-                  <th>IBAN</th>
+                  <th>Konto</th>
                   <th>Buchungen</th>
                   <th>Importiert</th>
                   <th>Aktionen</th>
@@ -176,7 +267,8 @@ import type { CategoryKind, RuleField, RuleMatchType } from '../../../../shared/
                   <tr>
                     <td>{{ monthYearLabel(s.year, s.month) }}</td>
                     <td>
-                      <code>{{ s.iban }}</code>
+                      {{ s.accountName }}
+                      <code class="iban">{{ s.iban }}</code>
                     </td>
                     <td>{{ s.transactionCount }}</td>
                     <td>{{ formatDate(s.importedAt) }}</td>
@@ -339,6 +431,32 @@ import type { CategoryKind, RuleField, RuleMatchType } from '../../../../shared/
       margin-left: 0.5rem;
     }
 
+    .text-right {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .muted {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--bt-text-muted);
+    }
+    .hint {
+      font-size: 0.85rem;
+      color: var(--bt-text-secondary);
+      margin: 0 0 1rem;
+    }
+    .account-name {
+      min-width: 140px;
+      width: 100%;
+    }
+    code.iban {
+      display: block;
+      width: fit-content;
+      margin-top: 0.2rem;
+      font-size: 0.75rem;
+    }
+
     .success-msg {
       color: var(--bt-success-text);
       font-size: 0.9rem;
@@ -379,7 +497,12 @@ import type { CategoryKind, RuleField, RuleMatchType } from '../../../../shared/
 export default class SettingsComponent {
   private readonly api = inject(ApiService);
 
-  readonly activeTab = signal<'categories' | 'rules' | 'statements'>('categories');
+  private readonly accountService = inject(AccountService);
+
+  readonly activeTab = signal<'categories' | 'rules' | 'accounts' | 'statements'>('categories');
+
+  // Accounts
+  readonly accountList = this.accountService.accounts;
 
   // Categories
   readonly categories = signal<Category[]>([]);
@@ -406,6 +529,49 @@ export default class SettingsComponent {
     this.loadCategories();
     this.loadRules();
     this.loadStatements();
+    this.loadAccounts();
+  }
+
+  loadAccounts() {
+    this.accountService
+      .refresh()
+      .catch(() => this.errorMsg.set('Konten konnten nicht geladen werden'));
+  }
+
+  renameAccount(account: Account, input: HTMLInputElement) {
+    const name = input.value.trim();
+    if (!name) {
+      input.value = account.name;
+      return;
+    }
+    if (name !== account.name) this.updateAccount(account, { name });
+  }
+
+  updateAccount(account: Account, input: AccountInput) {
+    this.api.updateAccount(account.id, input).subscribe({
+      next: (updated) => {
+        this.accountList.update((list) => list.map((a) => (a.id === updated.id ? updated : a)));
+        // Kontonamen in der Auszugsliste aktualisieren
+        if (input.name) this.loadStatements();
+      },
+      error: (err: HttpErrorResponse) =>
+        this.errorMsg.set(err.error?.error ?? 'Konto konnte nicht geändert werden'),
+    });
+  }
+
+  deleteAccount(account: Account) {
+    const msg =
+      `Konto „${account.name}“ löschen?\n\n` +
+      `Alle ${account.statementCount} Auszüge und deren Buchungen werden ebenfalls gelöscht.`;
+    if (!confirm(msg)) return;
+    this.api.deleteAccount(account.id).subscribe({
+      next: () => {
+        this.loadAccounts();
+        this.loadStatements();
+      },
+      error: (err: HttpErrorResponse) =>
+        this.errorMsg.set(err.error?.error ?? 'Fehler beim Löschen'),
+    });
   }
 
   loadCategories() {
@@ -518,6 +684,7 @@ export default class SettingsComponent {
     this.api.deleteStatement(id).subscribe({
       next: () => {
         this.statements.update((stmts) => stmts.filter((s) => s.id !== id));
+        this.loadAccounts();
       },
       error: (err: HttpErrorResponse) =>
         this.errorMsg.set(err.error?.error ?? 'Fehler beim Löschen'),
@@ -566,6 +733,16 @@ export default class SettingsComponent {
       'Dez',
     ];
     return `${months[month - 1]} ${year}`;
+  }
+
+  formatEuro(cents: number): string {
+    return fmtEuro(cents);
+  }
+
+  balanceLabel(account: Account): string {
+    if (!account.balanceMonth) return '';
+    const [year, month] = account.balanceMonth.split('-').map(Number);
+    return `Stand ${fmtMonthYear(year!, month!)}`;
   }
 
   formatDate(iso: string): string {
