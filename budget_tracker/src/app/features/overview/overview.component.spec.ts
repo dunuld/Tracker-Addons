@@ -41,6 +41,8 @@ describe('OverviewComponent', () => {
         count: 1,
       },
     ],
+    accountBalances: [],
+    totalBalanceCents: null,
   });
 
   beforeEach(async () => {
@@ -195,6 +197,8 @@ describe('OverviewComponent', () => {
           count: 1,
         },
       ],
+      accountBalances: [],
+      totalBalanceCents: null,
     };
     const req = httpMock.expectOne((req) => req.url.includes('api/reports/monthly'));
     req.flush(mockReport);
@@ -244,5 +248,64 @@ describe('OverviewComponent', () => {
     accounts.select(null);
     fixture.detectChanges();
     httpMock.expectOne((req) => req.url.includes('api/reports/monthly')).flush(createMockReport());
+  });
+
+  describe('Kontostände', () => {
+    const render = async (report: MonthlyReport) => {
+      const fixture = TestBed.createComponent(OverviewComponent);
+      fixture.componentInstance.currentYear.set(2026);
+      fixture.componentInstance.currentMonth.set(10);
+      fixture.detectChanges();
+      httpMock
+        .match((req) => req.url.includes('api/reports/monthly'))
+        .forEach((r) => r.flush(report));
+      await fixture.whenStable();
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    };
+
+    it('zeigt Kontostände mit Stand-Hinweis und Gesamtsumme', async () => {
+      const el = await render({
+        ...createMockReport(),
+        accountBalances: [
+          { accountId: 1, name: 'Giro', color: '#2196f3', balanceCents: 123456, asOf: '2026-10' },
+          {
+            accountId: 2,
+            name: 'Tagesgeld',
+            color: '#ff9800',
+            balanceCents: -5000,
+            asOf: '2026-09',
+          },
+        ],
+        totalBalanceCents: 118456,
+      });
+      const rows = [...el.querySelectorAll('.balances li')].map((li) =>
+        li.textContent?.replace(/\s+/g, ' ').trim(),
+      );
+      expect(rows[0]).toContain('Giro');
+      expect(rows[0]).not.toContain('Stand');
+      expect(rows[0]).toContain('1.234,56');
+      expect(rows[1]).toContain('Stand September 2026');
+      expect(el.querySelector('.balances li:nth-child(2) .balance-value')?.classList).toContain(
+        'negative',
+      );
+      expect(rows[2]).toContain('Gesamt');
+      expect(rows[2]).toContain('1.184,56');
+    });
+
+    it('zeigt bei einem Konto keine Gesamtsumme und ohne Konten keinen Bereich', async () => {
+      const el = await render({
+        ...createMockReport(),
+        accountBalances: [
+          { accountId: 1, name: 'Giro', color: '#2196f3', balanceCents: 100, asOf: '2026-10' },
+        ],
+        totalBalanceCents: 100,
+      });
+      expect(el.querySelectorAll('.balances li').length).toBe(1);
+      expect(el.querySelector('.balances .total')).toBeNull();
+
+      const empty = await render(createMockReport());
+      expect(empty.querySelector('.balances')).toBeNull();
+    });
   });
 });

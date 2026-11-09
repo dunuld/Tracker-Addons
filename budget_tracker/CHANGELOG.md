@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.0 (2026-11-09)
+
+### Neu
+
+- **Kontostände in der Monatsübersicht**: Saldo je Konto zum Monatsende und bei mehreren Konten
+  die Gesamtsumme. Fehlt der Auszug eines Kontos für den Monat, wird der letzte frühere Saldo mit
+  „Stand <Monat>“ angezeigt. Die Kontoauswahl gilt auch hier.
+
+### Technik
+
+- `api/reports/monthly` liefert zusätzlich `accountBalances` und `totalBalanceCents`
+
 ## 1.2.0 (2026-11-08)
 
 ### Neu

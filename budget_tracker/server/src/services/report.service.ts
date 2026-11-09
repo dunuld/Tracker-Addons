@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { accountScope } from '../accounts.js';
 import { monthStart, nextMonthStart } from '../month.js';
 import type {
+  AccountBalance,
   CategoryKind,
   CategoryTotal,
   MonthlyReport,
@@ -58,6 +59,7 @@ export class ReportService {
       };
     });
 
+    const accountBalances = this.accountBalances(year, month, accountId);
     return {
       year,
       month,
@@ -65,7 +67,38 @@ export class ReportService {
       expenseCents,
       balanceCents: incomeCents + expenseCents,
       categories: categoryTotals,
+      accountBalances,
+      totalBalanceCents: accountBalances.length
+        ? accountBalances.reduce((sum, b) => sum + b.balanceCents, 0)
+        : null,
     };
+  }
+
+  /**
+   * Kontostand je Konto zum Ende des Monats: Neuer Saldo des jüngsten Auszugs bis einschließlich
+   * zu diesem Monat. Ohne `accountId` alle Konten, die in „Alle Konten“ einfließen.
+   */
+  private accountBalances(year: number, month: number, accountId?: number): AccountBalance[] {
+    const filter = accountId !== undefined ? 'a.id = ?' : 'a.include_in_reports = 1';
+    const rows = this.db
+      .prepare(
+        `SELECT a.id, a.name, a.color, s.closing_cents, s.year, s.month
+           FROM accounts a
+           JOIN statements s ON s.id = (
+             SELECT s2.id FROM statements s2
+              WHERE s2.account_id = a.id AND s2.year * 12 + s2.month <= ?
+              ORDER BY s2.year DESC, s2.month DESC LIMIT 1)
+          WHERE ${filter}
+          ORDER BY a.sort, a.id`,
+      )
+      .all(year * 12 + month, ...(accountId !== undefined ? [accountId] : []));
+    return rows.map((row) => ({
+      accountId: Number(row['id']),
+      name: String(row['name']),
+      color: String(row['color']),
+      balanceCents: Number(row['closing_cents']),
+      asOf: `${String(row['year'])}-${String(row['month']).padStart(2, '0')}`,
+    }));
   }
 
   /**

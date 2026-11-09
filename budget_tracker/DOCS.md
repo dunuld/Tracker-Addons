@@ -48,6 +48,10 @@ zusätzlich, zu welchem Konto eine Buchung gehört.
 ### Monatsübersicht
 
 - Die Startseite zeigt Einnahmen, Ausgaben und Saldo des gewählten Monats.
+- Unter **Kontostände zum Monatsende** steht für jedes Konto der neue Saldo seines Auszugs aus
+  diesem Monat, bei mehreren Konten auch die Gesamtsumme. Fehlt der Auszug eines Kontos für den
+  Monat, wird der letzte frühere Saldo mit dem Hinweis „Stand <Monat>“ angezeigt. Es zählen die
+  Konten der aktuellen Kontoauswahl.
 - Ein Donut-Diagramm visualisiert die Ausgaben nach Kategorie.
 - Ein Klick auf eine Kategorie öffnet die gefilterte Transaktionsliste.
 - Mit den Pfeilen navigierst du zwischen den Monaten.

@@ -454,4 +454,59 @@ describe('Filter nach Konto', () => {
     ]);
     await api().get('/api/reports/monthly?year=2026&month=10&accountId=x').expect(400);
   });
+
+  it('liefert Kontostände zum Monatsende mit Summe', async () => {
+    const setClosing = (iban: string, year: number, month: number, cents: number) =>
+      db
+        .prepare(
+          `UPDATE statements SET closing_cents = ?
+            WHERE account_id = (SELECT id FROM accounts WHERE iban = ?) AND year = ? AND month = ?`,
+        )
+        .run(cents, iban, year, month);
+    insertTransactions(db, [{ date: '2026-09-02', amountCents: -1 }], 'DE01');
+    setClosing('DE01', 2026, 9, 50000);
+    setClosing('DE01', 2026, 10, 70000);
+    setClosing('DE02', 2026, 10, 30000);
+    setClosing('DE03', 2026, 10, 99999);
+    insertTransactions(db, [{ date: '2026-11-02', amountCents: -1 }], 'DE02');
+    setClosing('DE02', 2026, 11, 12345);
+
+    const october = (await api().get('/api/reports/monthly?year=2026&month=10').expect(200))
+      .body as MonthlyReport;
+    expect(october.accountBalances).toEqual([
+      { accountId: giro, name: 'DE01', color: '#2196f3', balanceCents: 70000, asOf: '2026-10' },
+      {
+        accountId: tagesgeld,
+        name: 'DE02',
+        color: '#2196f3',
+        balanceCents: 30000,
+        asOf: '2026-10',
+      },
+    ]);
+    expect(october.totalBalanceCents).toBe(100000);
+
+    // November: Giro hat keinen neueren Auszug → Stand Oktober
+    const november = (await api().get('/api/reports/monthly?year=2026&month=11').expect(200))
+      .body as MonthlyReport;
+    expect(november.accountBalances.map((b) => [b.balanceCents, b.asOf])).toEqual([
+      [70000, '2026-10'],
+      [12345, '2026-11'],
+    ]);
+
+    const september = (
+      await api().get(`/api/reports/monthly?year=2026&month=9&accountId=${giro}`).expect(200)
+    ).body as MonthlyReport;
+    expect(september.accountBalances.map((b) => b.balanceCents)).toEqual([50000]);
+    expect(september.totalBalanceCents).toBe(50000);
+
+    const hiddenOnly = (
+      await api().get(`/api/reports/monthly?year=2026&month=10&accountId=${hidden}`).expect(200)
+    ).body as MonthlyReport;
+    expect(hiddenOnly.totalBalanceCents).toBe(99999);
+
+    const before = (await api().get('/api/reports/monthly?year=2026&month=8').expect(200))
+      .body as MonthlyReport;
+    expect(before.accountBalances).toEqual([]);
+    expect(before.totalBalanceCents).toBeNull();
+  });
 });
