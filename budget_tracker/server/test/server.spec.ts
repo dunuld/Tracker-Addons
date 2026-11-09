@@ -127,6 +127,60 @@ describe('Datenbank', () => {
     expect(Number(db.prepare('SELECT COUNT(*) AS n FROM transactions').get()?.['n'])).toBe(2);
   });
 
+  it('migriert Schema v2: erlaubt die Kategorie-Quelle „transfer“ und behält Buchungen', () => {
+    const file = join(tempDir(), 'budget.db');
+    const v2 = new DatabaseSync(file);
+    v2.exec(readFileSync(new URL('./fixtures/schema-v2.sql', import.meta.url), 'utf8'));
+    v2.exec(`
+      INSERT INTO categories (id, name, kind, is_default)
+      VALUES (1, 'Sonstiges', 'expense', 1), (2, 'Hobby', 'expense', 0);
+      INSERT INTO accounts (id, iban, bank, name) VALUES (1, 'DE01', 'ING', 'Giro');
+      INSERT INTO statements (id, account_id, year, month, opening_cents, closing_cents, file_hash, file_name)
+      VALUES (1, 1, 2026, 10, 0, -15, 'h1', 'a.pdf');
+      INSERT INTO transactions (id, statement_id, booking_date, value_date, counterparty, amount_cents,
+                                category_id, category_source)
+      VALUES (7, 1, '2026-10-01', '2026-10-01', 'Laden', -10, 2, 'manual'),
+             (8, 1, '2026-10-02', '2026-10-02', 'Kino', -5, 2, 'default');
+      PRAGMA user_version = 2;
+    `);
+    v2.close();
+
+    const db = openDatabase(file);
+    openDbs.push(db);
+    expect(db.prepare('PRAGMA user_version').get()?.['user_version']).toBe(SCHEMA_VERSION);
+    expect(db.prepare('PRAGMA foreign_keys').get()?.['foreign_keys']).toBe(1);
+    expect(
+      db.prepare('SELECT id, counterparty, category_source FROM transactions ORDER BY id').all(),
+    ).toEqual([
+      { id: 7, counterparty: 'Laden', category_source: 'manual' },
+      { id: 8, counterparty: 'Kino', category_source: 'default' },
+    ]);
+    const indexes = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'transactions'")
+      .all()
+      .map((r) => r['name']);
+    expect(indexes).toEqual(
+      expect.arrayContaining([
+        'transactions_by_statement',
+        'transactions_by_date',
+        'transactions_by_category',
+      ]),
+    );
+    db.prepare("UPDATE transactions SET category_source = 'transfer' WHERE id = 8").run();
+
+    // Trigger auf categories greifen weiterhin auf die neu aufgebaute Tabelle
+    db.prepare('DELETE FROM categories WHERE id = 2').run();
+    expect(
+      db.prepare('SELECT category_id, category_source FROM transactions ORDER BY id').all(),
+    ).toEqual([
+      { category_id: 1, category_source: 'default' },
+      { category_id: 1, category_source: 'default' },
+    ]);
+    // ON DELETE CASCADE von statements → transactions besteht weiter
+    db.prepare('DELETE FROM statements').run();
+    expect(Number(db.prepare('SELECT COUNT(*) AS n FROM transactions').get()?.['n'])).toBe(0);
+  });
+
   it('lehnt ein neueres Schema ab', () => {
     const file = join(tempDir(), 'budget.db');
     const db = openDatabase(file);

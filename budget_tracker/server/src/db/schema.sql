@@ -1,4 +1,4 @@
--- Schema-Version 2 (PRAGMA user_version). Beträge in Integer-Cent, Daten als ISO-Text.
+-- Schema-Version 3 (PRAGMA user_version). Beträge in Integer-Cent, Daten als ISO-Text.
 
 CREATE TABLE categories (
   id         INTEGER PRIMARY KEY,
@@ -60,7 +60,9 @@ CREATE TABLE transactions (
   purpose         TEXT    NOT NULL DEFAULT '',
   amount_cents    INTEGER NOT NULL,
   category_id     INTEGER REFERENCES categories (id) ON DELETE SET NULL,
-  category_source TEXT    NOT NULL DEFAULT 'default' CHECK (category_source IN ('rule', 'manual', 'default')),
+  -- transfer = automatisch als Umbuchung zwischen eigenen Konten erkannt
+  category_source TEXT    NOT NULL DEFAULT 'default'
+                          CHECK (category_source IN ('rule', 'manual', 'default', 'transfer')),
   rule_id         INTEGER REFERENCES rules (id) ON DELETE SET NULL
 );
 CREATE INDEX transactions_by_statement ON transactions (statement_id);

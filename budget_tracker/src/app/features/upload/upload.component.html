@@ -50,6 +50,12 @@
       @if (result()!.uncategorizedCount) {
         <dd>{{ result()!.uncategorizedCount }}</dd>
       }
+      @if (result()!.transferCount) {
+        <dt>Umbuchungen</dt>
+        <dd>
+          {{ result()!.transferCount }} Buchungen als Umbuchung zwischen eigenen Konten erkannt
+        </dd>
+      }
     </dl>
     @if (!result()!.balanceOk) {
       <div class="warning">

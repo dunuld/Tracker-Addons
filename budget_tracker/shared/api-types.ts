@@ -89,7 +89,8 @@ export interface Statement {
   transactionCount: number;
 }
 
-export type CategorySource = 'rule' | 'manual' | 'default';
+/** `transfer` = automatisch als Umbuchung zwischen eigenen Konten erkannt */
+export type CategorySource = 'rule' | 'manual' | 'default' | 'transfer';
 
 export interface Transaction {
   id: number;
@@ -135,6 +136,9 @@ export interface ImportResult {
   /** true, wenn das Konto bei diesem Import neu angelegt wurde */
   accountCreated: boolean;
   uncategorizedCount: number;
+  /** Buchungen, die durch diesen Import als Umbuchung zwischen eigenen Konten erkannt wurden
+   *  (inkl. Gegenbuchungen auf anderen Konten) */
+  transferCount: number;
   /** Summe aller Buchungen */
   sumCents: number;
   /** true, wenn Summe der Buchungen = Neuer Saldo − Alter Saldo */

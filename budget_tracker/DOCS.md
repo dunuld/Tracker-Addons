@@ -45,6 +45,23 @@ Sobald es mehr als ein Konto gibt, erscheint in Übersicht, Transaktionen und Ve
 Seiten und bleibt im Browser gespeichert. Unter „Alle Konten“ zeigt die Transaktionsliste
 zusätzlich, zu welchem Konto eine Buchung gehört.
 
+#### Umbuchungen zwischen eigenen Konten
+
+Überweisungen zwischen deinen Konten sind weder Einnahme noch Ausgabe. Das Haushaltsbuch erkennt
+sie automatisch und ordnet beide Seiten der Kategorie **Umbuchungen** zu (die erste Kategorie vom
+Typ „Umbuchung“). Diese Buchungen zählen dann nicht mehr zu Einnahmen und Ausgaben:
+
+- **Gegenbuchung**: Eine Abbuchung auf einem Konto und eine Gutschrift über genau denselben Betrag
+  auf einem anderen deiner Konten, höchstens 3 Tage auseinander. Dafür müssen die Auszüge beider
+  Konten importiert sein.
+- **IBAN**: Steht die IBAN eines anderen deiner Konten im Empfänger oder Verwendungszweck, gilt
+  die Buchung auch ohne importierten Gegenauszug als Umbuchung.
+
+Automatisch erkannte Umbuchungen sind in der Transaktionsliste mit ⇄ markiert. Ist eine Buchung
+fälschlich erkannt, ordne sie einfach manuell einer anderen Kategorie zu – manuelle Zuordnungen
+werden nie überschrieben. Die Erkennung läuft beim Import, beim Löschen von Auszügen oder Konten,
+bei **Regeln neu anwenden** und beim Start des Add-ons.
+
 ### Monatsübersicht
 
 - Die Startseite zeigt Einnahmen, Ausgaben und Saldo des gewählten Monats.

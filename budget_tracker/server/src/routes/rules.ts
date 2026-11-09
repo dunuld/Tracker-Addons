@@ -8,6 +8,7 @@ import type {
   RuleMatchType,
 } from '../../../shared/api-types.js';
 import { Categorizer, compileRuleRegex } from '../categorization/categorizer.js';
+import { TransferDetector } from '../categorization/transfers.js';
 import { badRequest, notFound, parseId } from '../http-error.js';
 
 const FIELDS: readonly RuleField[] = ['counterparty', 'purpose', 'any'];
@@ -46,6 +47,7 @@ const trimmed = (value: unknown) => (typeof value === 'string' ? value.trim() : 
 export function rulesRouter(db: DatabaseSync): Router {
   const router = Router();
   const categorizer = new Categorizer(db);
+  const transfers = new TransferDetector(db);
   const byId = (id: number) => db.prepare('SELECT * FROM rules WHERE id = ?').get(id);
 
   router.get('/', (_req, res) => {
@@ -72,7 +74,7 @@ export function rulesRouter(db: DatabaseSync): Router {
   });
 
   router.post('/reapply', (_req, res) => {
-    const result: ReapplyResult = { updated: categorizer.reapply() };
+    const result: ReapplyResult = { updated: categorizer.reapply() + transfers.detect() };
     res.json(result);
   });
 

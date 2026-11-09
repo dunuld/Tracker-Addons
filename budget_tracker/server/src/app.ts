@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import express, { type ErrorRequestHandler, type Express, type RequestHandler } from 'express';
 import type { ApiError, HealthResponse } from '../../shared/api-types.js';
 import { Categorizer } from './categorization/categorizer.js';
+import { TransferDetector } from './categorization/transfers.js';
 import type { Database } from './db/database.js';
 import { HttpError } from './http-error.js';
 import { accountsRouter } from './routes/accounts.js';
@@ -63,10 +64,14 @@ export function createApp(db: Database, options: AppOptions = {}): Express {
   });
 
   const categorizer = new Categorizer(db);
+  const transfers = new TransferDetector(db);
   const imports = new ImportService(db, {
     uploadsDir: options.uploadsDir ?? null,
     categorize: (tx) => categorizer.apply(tx),
+    detectTransfers: () => transfers.detectInTransaction(),
   });
+  // Bestandsdaten (z. B. nach Update) einmal beim Start auf Umbuchungen prüfen
+  transfers.detect();
 
   api.use('/accounts', accountsRouter(db, imports));
   api.use('/statements', statementsRouter(imports));

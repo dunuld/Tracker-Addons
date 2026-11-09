@@ -7,7 +7,7 @@ import { ensureDefaultCategory, seedDefaults } from './seed.js';
 /** Kapselt den SQLite-Treiber (node:sqlite); bei Bedarf gegen better-sqlite3 austauschbar. */
 export type Database = DatabaseSync;
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const schemaSql = (): string => readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 
@@ -39,19 +39,20 @@ function migrate(db: Database): void {
       `Datenbank-Schema v${version} ist neuer als diese Version des Addons (v${SCHEMA_VERSION}).`,
     );
   }
-  // Tabellen-Neuaufbau (v2) nur ohne Fremdschlüsselprüfung möglich, sonst löscht DROP TABLE
+  // Tabellen-Neuaufbau (v2, v3) nur ohne Fremdschlüsselprüfung möglich, sonst löscht DROP TABLE
   // per CASCADE alle Buchungen. Das PRAGMA wirkt nicht innerhalb einer Transaktion.
-  const rebuild = version >= 1 && version < 2;
+  const rebuild = version >= 1 && version < 3;
   if (rebuild) db.exec('PRAGMA foreign_keys = OFF');
   try {
     transaction(db, () => {
       if (version < 1) {
         db.exec(schemaSql());
         seedDefaults(db);
-      } else if (version < 2) {
-        migrateToV2(db);
+      } else {
+        if (version < 2) migrateToV2(db);
+        if (version < 3) migrateToV3(db);
       }
-      // Künftige Migrationen: if (version < 3) { ... }
+      // Künftige Migrationen: if (version < 4) { ... }
       ensureDefaultCategory(db);
       db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
     });
@@ -113,6 +114,46 @@ function migrateToV2(db: Database): void {
 
   if (db.prepare('PRAGMA foreign_key_check').all().length) {
     throw new Error('Migration auf Schema v2 fehlgeschlagen: verwaiste Fremdschlüssel');
+  }
+}
+
+/**
+ * v2 → v3: `transactions.category_source` erlaubt zusätzlich `transfer`
+ * (automatisch erkannte Umbuchung). SQLite kann CHECK-Constraints nur per Neuaufbau ändern.
+ */
+function migrateToV3(db: Database): void {
+  db.exec(`
+    CREATE TABLE transactions_v3 (
+      id              INTEGER PRIMARY KEY,
+      statement_id    INTEGER NOT NULL REFERENCES statements (id) ON DELETE CASCADE,
+      booking_date    TEXT    NOT NULL CHECK (booking_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      value_date      TEXT    NOT NULL CHECK (value_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+      type            TEXT    NOT NULL DEFAULT '',
+      counterparty    TEXT    NOT NULL DEFAULT '',
+      purpose         TEXT    NOT NULL DEFAULT '',
+      amount_cents    INTEGER NOT NULL,
+      category_id     INTEGER REFERENCES categories (id) ON DELETE SET NULL,
+      category_source TEXT    NOT NULL DEFAULT 'default'
+                              CHECK (category_source IN ('rule', 'manual', 'default', 'transfer')),
+      rule_id         INTEGER REFERENCES rules (id) ON DELETE SET NULL
+    );
+    INSERT INTO transactions_v3 (id, statement_id, booking_date, value_date, type, counterparty,
+                                 purpose, amount_cents, category_id, category_source, rule_id)
+      SELECT id, statement_id, booking_date, value_date, type, counterparty,
+             purpose, amount_cents, category_id, category_source, rule_id
+        FROM transactions;
+    DROP TABLE transactions;
+    -- Die Trigger auf categories verweisen per Namen auf transactions, das hier kurz fehlt.
+    -- Ohne Legacy-Modus bricht RENAME bei der Schemaprüfung dieser Trigger ab.
+    PRAGMA legacy_alter_table = ON;
+    ALTER TABLE transactions_v3 RENAME TO transactions;
+    PRAGMA legacy_alter_table = OFF;
+    CREATE INDEX transactions_by_statement ON transactions (statement_id);
+    CREATE INDEX transactions_by_date ON transactions (booking_date);
+    CREATE INDEX transactions_by_category ON transactions (category_id);
+  `);
+  if (db.prepare('PRAGMA foreign_key_check').all().length) {
+    throw new Error('Migration auf Schema v3 fehlgeschlagen: verwaiste Fremdschlüssel');
   }
 }
 

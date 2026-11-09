@@ -14,7 +14,7 @@ Home Assistant. Lade monatlich deinen ING-Kontoauszug als PDF hoch; alle Buchung
 automatisch ausgelesen, anhand von Regeln kategorisiert und als Diagramme dargestellt.
 
 - **PDF-Import** von ING-Girokonto-Auszügen inkl. Saldo-Prüfung und Duplikaterkennung
-- **Mehrere Konten** mit Kontoauswahl in Übersicht, Transaktionen und Verlauf
+- **Mehrere Konten** mit Kontoauswahl, Kontoständen und automatischer Erkennung von Umbuchungen
 - **Regelbasierte Kategorisierung** mit anpassbaren Kategorien und Regeln
 - **Monatsübersicht** mit Einnahmen, Ausgaben, Saldo und Ausgaben nach Kategorie
 - **Transaktionsliste** mit Filtern und direkter Kategorie-Zuordnung

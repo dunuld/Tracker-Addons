@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.4.0 (2026-11-09)
+
+### Neu
+
+- **Umbuchungen zwischen eigenen Konten werden automatisch erkannt**: Abbuchung und Gutschrift
+  über denselben Betrag auf zwei eigenen Konten (höchstens 3 Tage auseinander) oder eine Buchung
+  mit der IBAN eines eigenen Kontos landen in „Umbuchungen“ und zählen nicht mehr als Einnahme
+  oder Ausgabe. In der Transaktionsliste sind sie mit ⇄ markiert, manuelle Zuordnungen bleiben
+  unangetastet.
+- **Upload**: Das Import-Ergebnis nennt die Zahl der erkannten Umbuchungen
+
+### Technik
+
+- Datenbank-Schema v3: neue Kategorie-Quelle `transfer`; bestehende Daten werden beim Start
+  migriert und einmal auf Umbuchungen geprüft
+- `ImportResult.transferCount`; „Regeln neu anwenden“ zählt erkannte Umbuchungen mit
+
 ## 1.3.0 (2026-11-09)
 
 ### Neu
