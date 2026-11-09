@@ -70,8 +70,6 @@ export function createApp(db: Database, options: AppOptions = {}): Express {
     categorize: (tx) => categorizer.apply(tx),
     detectTransfers: () => transfers.detectInTransaction(),
   });
-  // Bestandsdaten (z. B. nach Update) einmal beim Start auf Umbuchungen prüfen
-  transfers.detect();
 
   api.use('/accounts', accountsRouter(db, imports));
   api.use('/statements', statementsRouter(imports));

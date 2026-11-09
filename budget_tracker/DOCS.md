@@ -59,8 +59,8 @@ Typ „Umbuchung“). Diese Buchungen zählen dann nicht mehr zu Einnahmen und A
 
 Automatisch erkannte Umbuchungen sind in der Transaktionsliste mit ⇄ markiert. Ist eine Buchung
 fälschlich erkannt, ordne sie einfach manuell einer anderen Kategorie zu – manuelle Zuordnungen
-werden nie überschrieben. Die Erkennung läuft beim Import, beim Löschen von Auszügen oder Konten,
-bei **Regeln neu anwenden** und beim Start des Add-ons.
+werden nie überschrieben. Die Erkennung läuft beim Import, beim Löschen von Auszügen oder Konten
+und bei **Regeln neu anwenden**.
 
 ### Monatsübersicht
 
@@ -113,6 +113,11 @@ Supervisor verwaltet wird und bei Updates erhalten bleibt:
 
 Die Daten verlassen niemals dein Home-Assistant-System und sind in Home-Assistant-Backups des
 Add-ons enthalten.
+
+Die Datenbank wird beim ersten Start angelegt; es gibt keine automatischen Migrationen. Passt eine
+vorhandene `budget.db` nicht zur installierten Version (z. B. aus einer Vorabversion vor 1.4.0),
+startet das Add-on mit einer Fehlermeldung. Lösche dann `/data/budget.db` und `/data/uploads/`
+und importiere die Kontoauszüge neu.
 
 ## Bekannte Einschränkungen
 

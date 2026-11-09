@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -85,108 +85,12 @@ describe('Datenbank', () => {
     );
   });
 
-  it('migriert Schema v1: legt je IBAN ein Konto an und behält Auszüge und Buchungen', () => {
+  it.each([1, 2, SCHEMA_VERSION + 1])('lehnt eine Datenbank mit Schema v%i ab', (version) => {
     const file = join(tempDir(), 'budget.db');
-    const v1 = new DatabaseSync(file);
-    v1.exec(readFileSync(new URL('./fixtures/schema-v1.sql', import.meta.url), 'utf8'));
-    v1.exec(`
-      INSERT INTO categories (id, name, kind, is_default) VALUES (1, 'Sonstiges', 'expense', 1);
-      INSERT INTO statements (id, bank, iban, year, month, opening_cents, closing_cents, file_hash, file_name)
-      VALUES (1, 'ING', 'DE00111122223333444455', 2026, 9, 0, -500, 'h1', 'a.pdf'),
-             (2, 'ING', 'DE00999988887777666655', 2026, 9, 1000, 900, 'h2', 'b.pdf'),
-             (3, 'ING', 'DE00111122223333444455', 2026, 10, -500, -700, 'h3', 'c.pdf');
-      INSERT INTO transactions (statement_id, booking_date, value_date, amount_cents, category_id)
-      VALUES (1, '2026-09-01', '2026-09-01', -500, 1), (2, '2026-09-02', '2026-09-02', -100, 1),
-             (3, '2026-10-01', '2026-10-01', -200, 1);
-      PRAGMA user_version = 1;
-    `);
-    v1.close();
-
-    const db = openDatabase(file);
-    openDbs.push(db);
-    expect(db.prepare('PRAGMA user_version').get()?.['user_version']).toBe(SCHEMA_VERSION);
-    expect(db.prepare('PRAGMA foreign_keys').get()?.['foreign_keys']).toBe(1);
-    expect(db.prepare('SELECT iban, bank, name, sort FROM accounts ORDER BY id').all()).toEqual([
-      { iban: 'DE00111122223333444455', bank: 'ING', name: 'ING ••4455', sort: 0 },
-      { iban: 'DE00999988887777666655', bank: 'ING', name: 'ING ••6655', sort: 1 },
-    ]);
-    expect(
-      db
-        .prepare(
-          'SELECT s.id, a.iban, s.file_hash FROM statements s JOIN accounts a ON a.id = s.account_id ORDER BY s.id',
-        )
-        .all(),
-    ).toEqual([
-      { id: 1, iban: 'DE00111122223333444455', file_hash: 'h1' },
-      { id: 2, iban: 'DE00999988887777666655', file_hash: 'h2' },
-      { id: 3, iban: 'DE00111122223333444455', file_hash: 'h3' },
-    ]);
-    expect(Number(db.prepare('SELECT COUNT(*) AS n FROM transactions').get()?.['n'])).toBe(3);
-    // Fremdschlüssel greifen weiterhin auf die neu aufgebaute Tabelle
-    db.prepare('DELETE FROM statements WHERE id = 1').run();
-    expect(Number(db.prepare('SELECT COUNT(*) AS n FROM transactions').get()?.['n'])).toBe(2);
-  });
-
-  it('migriert Schema v2: erlaubt die Kategorie-Quelle „transfer“ und behält Buchungen', () => {
-    const file = join(tempDir(), 'budget.db');
-    const v2 = new DatabaseSync(file);
-    v2.exec(readFileSync(new URL('./fixtures/schema-v2.sql', import.meta.url), 'utf8'));
-    v2.exec(`
-      INSERT INTO categories (id, name, kind, is_default)
-      VALUES (1, 'Sonstiges', 'expense', 1), (2, 'Hobby', 'expense', 0);
-      INSERT INTO accounts (id, iban, bank, name) VALUES (1, 'DE01', 'ING', 'Giro');
-      INSERT INTO statements (id, account_id, year, month, opening_cents, closing_cents, file_hash, file_name)
-      VALUES (1, 1, 2026, 10, 0, -15, 'h1', 'a.pdf');
-      INSERT INTO transactions (id, statement_id, booking_date, value_date, counterparty, amount_cents,
-                                category_id, category_source)
-      VALUES (7, 1, '2026-10-01', '2026-10-01', 'Laden', -10, 2, 'manual'),
-             (8, 1, '2026-10-02', '2026-10-02', 'Kino', -5, 2, 'default');
-      PRAGMA user_version = 2;
-    `);
-    v2.close();
-
-    const db = openDatabase(file);
-    openDbs.push(db);
-    expect(db.prepare('PRAGMA user_version').get()?.['user_version']).toBe(SCHEMA_VERSION);
-    expect(db.prepare('PRAGMA foreign_keys').get()?.['foreign_keys']).toBe(1);
-    expect(
-      db.prepare('SELECT id, counterparty, category_source FROM transactions ORDER BY id').all(),
-    ).toEqual([
-      { id: 7, counterparty: 'Laden', category_source: 'manual' },
-      { id: 8, counterparty: 'Kino', category_source: 'default' },
-    ]);
-    const indexes = db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'transactions'")
-      .all()
-      .map((r) => r['name']);
-    expect(indexes).toEqual(
-      expect.arrayContaining([
-        'transactions_by_statement',
-        'transactions_by_date',
-        'transactions_by_category',
-      ]),
-    );
-    db.prepare("UPDATE transactions SET category_source = 'transfer' WHERE id = 8").run();
-
-    // Trigger auf categories greifen weiterhin auf die neu aufgebaute Tabelle
-    db.prepare('DELETE FROM categories WHERE id = 2').run();
-    expect(
-      db.prepare('SELECT category_id, category_source FROM transactions ORDER BY id').all(),
-    ).toEqual([
-      { category_id: 1, category_source: 'default' },
-      { category_id: 1, category_source: 'default' },
-    ]);
-    // ON DELETE CASCADE von statements → transactions besteht weiter
-    db.prepare('DELETE FROM statements').run();
-    expect(Number(db.prepare('SELECT COUNT(*) AS n FROM transactions').get()?.['n'])).toBe(0);
-  });
-
-  it('lehnt ein neueres Schema ab', () => {
-    const file = join(tempDir(), 'budget.db');
-    const db = openDatabase(file);
-    db.exec(`PRAGMA user_version = ${SCHEMA_VERSION + 1}`);
-    db.close();
-    expect(() => openDatabase(file)).toThrow(/neuer/);
+    const old = new DatabaseSync(file);
+    old.exec(`CREATE TABLE statements (id INTEGER PRIMARY KEY); PRAGMA user_version = ${version}`);
+    old.close();
+    expect(() => openDatabase(file)).toThrow(/budget\.db löschen/);
   });
 
   it('schützt die Standardkategorie und ordnet Buchungen gelöschter Kategorien ihr zu', () => {

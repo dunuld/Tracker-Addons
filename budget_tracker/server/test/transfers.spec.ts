@@ -190,17 +190,4 @@ describe('Umbuchungen in der Datenbank', () => {
     expect(new TransferDetector(db).detect()).toBe(0);
     expect(source(out!)?.['category_source']).toBe('default');
   });
-
-  it('prüft Bestandsdaten beim Start der App', () => {
-    const fresh = openDatabase(':memory:');
-    const [out] = insertTransactions(fresh, [{ date: '2026-10-01', amountCents: -300 }], 'DE01');
-    insertTransactions(fresh, [{ date: '2026-10-02', amountCents: 300 }], 'DE02');
-    createApp(fresh);
-    expect(
-      fresh.prepare('SELECT category_source FROM transactions WHERE id = ?').get(out!)?.[
-        'category_source'
-      ],
-    ).toBe('transfer');
-    fresh.close();
-  });
 });

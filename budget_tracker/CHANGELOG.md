@@ -11,10 +11,15 @@
   unangetastet.
 - **Upload**: Das Import-Ergebnis nennt die Zahl der erkannten Umbuchungen
 
+### Wichtig: Datenbank wird neu angelegt
+
+- Die Datenbank-Migrationen wurden entfernt; das Schema (v3, inkl. Kategorie-Quelle `transfer`)
+  wird nur noch bei einer neuen Datenbank angelegt. Eine `budget.db` aus Version 1.3.0 oder älter
+  wird beim Start mit einer Fehlermeldung abgelehnt: `/data/budget.db` und `/data/uploads/`
+  löschen und Auszüge neu importieren.
+
 ### Technik
 
-- Datenbank-Schema v3: neue Kategorie-Quelle `transfer`; bestehende Daten werden beim Start
-  migriert und einmal auf Umbuchungen geprüft
 - `ImportResult.transferCount`; „Regeln neu anwenden“ zählt erkannte Umbuchungen mit
 
 ## 1.3.0 (2026-11-09)

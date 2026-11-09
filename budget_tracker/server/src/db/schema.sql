@@ -1,4 +1,4 @@
--- Schema-Version 3 (PRAGMA user_version). Beträge in Integer-Cent, Daten als ISO-Text.
+-- Schema-Version 3 (PRAGMA user_version), ohne Migrationen: wird nur bei neuer Datenbank angelegt. Beträge in Integer-Cent, Daten als ISO-Text.
 
 CREATE TABLE categories (
   id         INTEGER PRIMARY KEY,
