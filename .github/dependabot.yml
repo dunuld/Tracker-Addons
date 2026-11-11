@@ -8,6 +8,7 @@ updates:
     directories:
       - /budget_tracker
       - /new_addon
+      - /time_tracker
     schedule:
       interval: weekly
       day: monday
@@ -71,6 +72,7 @@ updates:
     directories:
       - /budget_tracker
       - /new_addon
+      - /time_tracker
     schedule:
       interval: weekly
       day: monday

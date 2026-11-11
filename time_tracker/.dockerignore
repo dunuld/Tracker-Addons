@@ -1,0 +1,12 @@
+node_modules
+dist
+.angular
+.git
+.idea
+.vscode
+.junie
+.data
+coverage
+*.iml
+# Tests gehören nicht ins Image
+server/test

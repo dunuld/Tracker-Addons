@@ -1,0 +1,131 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  font-family: var(--app-font-family);
+  color: var(--app-text);
+  background: var(--app-bg);
+}
+
+/* === Kopfzeile / Navigation === */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  min-height: 48px;
+}
+
+.nav-brand {
+  flex: none;
+  font-weight: 500;
+  font-size: 1.1rem;
+  margin-right: 0.5rem;
+  color: var(--app-primary);
+  white-space: nowrap;
+}
+
+/* In Home Assistant steht der Panel-Titel bereits in Sidebar bzw. Kopfzeile */
+:host-context(.ha-embedded) .nav-brand {
+  display: none;
+}
+
+.nav-links {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.nav-links::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-links a {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 0.9rem;
+  text-decoration: none;
+  color: var(--app-text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.nav-links a:hover {
+  color: var(--app-text);
+  background: var(--app-hover);
+}
+
+.nav-links a.active {
+  color: var(--app-primary);
+  border-bottom-color: var(--app-primary);
+}
+
+.theme-toggle {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  transition: background 0.15s;
+}
+
+.theme-toggle:hover {
+  background: var(--app-hover-btn);
+}
+
+/* === Inhalt === */
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+@media (max-width: 600px) {
+  .app-nav {
+    padding: 0 0.25rem 0 0;
+  }
+
+  .nav-brand {
+    display: none;
+  }
+
+  .nav-links a {
+    padding: 0 0.75rem;
+  }
+
+  .app-main {
+    padding: 1rem 0.75rem;
+  }
+}

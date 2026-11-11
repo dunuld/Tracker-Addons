@@ -16,6 +16,7 @@ README.md                    # Übersicht des Repositorys
 .github/workflows/           # CI, Code Quality und Releases (für alle Add-ons)
 .github/scripts/             # Hilfsskripte der Workflows
 new_addon/                   # Add-on „Neues Add-on“ (Grundgerüst, gleicher Aufbau)
+time_tracker/                # Add-on „Zeiterfassung“ (gleicher Aufbau)
 budget_tracker/              # Add-on „Haushaltsbuch“
   config.yaml                # Add-on-Konfiguration (Version, Architekturen, Ingress)
   Dockerfile                 # Multi-Stage Build (node:24-alpine)
@@ -57,6 +58,10 @@ npm run dev:server
 ```
 
 Öffne `http://localhost:4200/`. Der Proxy leitet `/api/*` an `http://localhost:8099` weiter.
+
+Die **Zeiterfassung** erkennt Benutzer über die Ingress-Header `X-Remote-User-Id` und
+`X-Remote-User-Display-Name`. Lokal (ohne `ADDON_MODE`) verwendet der Server ohne diese Header den
+Benutzer aus `DEV_USER` (Standard: `dev`); `DEV_USER= npm run dev:server` schaltet das ab.
 
 ### Build
 
@@ -159,3 +164,9 @@ CI, Code Quality und Releases erkennen das Add-on automatisch an seiner `config.
 - Express: MIT
 - pdfjs-dist: Apache-2.0
 - chart.js: MIT
+
+## Lizenzen der Abhängigkeiten (Zeiterfassung)
+
+- Angular: MIT
+- Express: MIT
+- date-holidays: ISC (Feiertagsdaten: CC-BY-SA-4.0)

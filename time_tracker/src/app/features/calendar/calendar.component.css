@@ -1,0 +1,88 @@
+.month-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.month-header h2 {
+  margin: 0;
+  min-width: 12rem;
+  text-align: center;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0 1rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stat span {
+  font-size: 0.8rem;
+  color: var(--app-text-secondary);
+}
+
+.stat strong {
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+tr.day {
+  cursor: pointer;
+}
+
+tr.day:hover {
+  background: var(--app-row-hover);
+}
+
+tr.day.today td:first-child {
+  color: var(--app-primary);
+  font-weight: 600;
+}
+
+tr.day.off td:first-child,
+tr.day.untracked td {
+  color: var(--app-text-muted);
+}
+
+tr.week-sum td {
+  background: var(--app-bg-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.badge.type-vacation {
+  background: var(--app-active);
+  color: var(--app-primary);
+}
+
+.badge.type-sick {
+  background: var(--app-error-bg);
+  color: var(--app-error-text);
+}
+
+.badge.type-holiday {
+  background: var(--app-success-bg);
+  color: var(--app-success-text);
+}
+
+.badge.type-flex {
+  background: var(--app-warning-bg);
+  color: var(--app-warning-text);
+}
+
+.warn-icon {
+  color: var(--app-warning-text);
+  margin-left: 0.25rem;
+}
+
+td.date {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

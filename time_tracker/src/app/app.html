@@ -1,0 +1,35 @@
+<header class="app-header">
+  <nav class="app-nav" aria-label="Hauptnavigation">
+    <div class="nav-brand">Zeiterfassung</div>
+    <div class="nav-links">
+      @if (session.user()) {
+        <a routerLink="" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"
+          >Heute</a
+        >
+        <a routerLink="calendar" routerLinkActive="active">Kalender</a>
+        <a routerLink="projects" routerLinkActive="active">Projekte</a>
+        <a routerLink="settings" routerLinkActive="active">Einstellungen</a>
+      }
+    </div>
+    <button
+      class="theme-toggle"
+      (click)="themeService.toggle()"
+      [title]="themeTitle()"
+      [attr.aria-label]="themeTitle()"
+      type="button"
+    >
+      {{ themeLabel() }}
+    </button>
+  </nav>
+</header>
+<main class="app-main">
+  @if (session.error()) {
+    <p class="alert error" role="alert">{{ session.error() }}</p>
+  } @else if (!session.loaded()) {
+    <p class="muted">Lade …</p>
+  } @else if (session.user()) {
+    <router-outlet></router-outlet>
+  } @else {
+    <app-setup></app-setup>
+  }
+</main>

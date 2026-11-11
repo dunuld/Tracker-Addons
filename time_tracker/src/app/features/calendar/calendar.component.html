@@ -1,0 +1,124 @@
+<div class="month-header">
+  <button class="btn icon" type="button" (click)="shiftMonth(-1)" aria-label="Vorheriger Monat">
+    ◀
+  </button>
+  <h2>{{ title() }}</h2>
+  <button class="btn icon" type="button" (click)="shiftMonth(1)" aria-label="Nächster Monat">
+    ▶
+  </button>
+</div>
+
+@if (error()) {
+  <p class="alert error" role="alert">{{ error() }}</p>
+}
+
+@if (summary(); as s) {
+  <div class="stats">
+    <div class="app-card stat">
+      <span>Ist / Soll (Monat)</span>
+      <strong class="num"
+        >{{ fmtDuration(s.totals.netMinutes) }} / {{ fmtDuration(s.totals.targetMinutes) }}</strong
+      >
+    </div>
+    <div class="app-card stat">
+      <span>Differenz Monat</span>
+      <strong class="num" [class]="signClass(s.totals.diffMinutes)">{{
+        fmtDuration(s.totals.diffMinutes, true)
+      }}</strong>
+    </div>
+    <div class="app-card stat">
+      <span>Home Office</span>
+      <strong class="num">
+        {{ s.totals.homeDays }} von {{ s.totals.homeDays + s.totals.officeDays }} Tagen
+        @if (homeOfficeQuote() !== null) {
+          ({{ homeOfficeQuote() }} %)
+        }
+      </strong>
+    </div>
+    @if (balance(); as b) {
+      <div class="app-card stat">
+        <span>Saldo bis {{ fmtDate(b.asOf) }}</span>
+        <strong class="num" [class]="signClass(b.balanceMinutes)">{{
+          fmtDuration(b.balanceMinutes, true)
+        }}</strong>
+      </div>
+    }
+  </div>
+
+  <div class="app-card table-scroll">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Tag</th>
+          <th>Art</th>
+          <th>Ort</th>
+          <th class="num">Netto</th>
+          <th class="num">Soll</th>
+          <th class="num">Diff.</th>
+          <th>Buchungen</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (w of weeks(); track w.start) {
+          @for (d of w.days; track d.date) {
+            <tr
+              class="day"
+              [class.today]="d.date === today"
+              [class.off]="d.targetMinutes === 0 && !d.calc.netMinutes"
+              [class.untracked]="d.untracked"
+              tabindex="0"
+              (click)="open(d)"
+              (keydown.enter)="open(d)"
+            >
+              <td class="date">{{ weekdayLabels[d.weekday] }} {{ fmtDate(d.date).slice(0, 6) }}</td>
+              <td>
+                @if (d.dayType !== 'work' || d.dayTypeManual) {
+                  <span class="badge type-{{ d.dayType }}" [title]="d.holidayName ?? ''">
+                    {{
+                      d.holidayName && !d.dayTypeManual ? d.holidayName : dayTypeLabels[d.dayType]
+                    }}
+                  </span>
+                }
+                @if (d.dayTypeManual) {
+                  <span title="manuell gesetzt">✎</span>
+                }
+                @if (d.calc.warnings.length) {
+                  <span class="warn-icon" [title]="warnings(d)">⚠</span>
+                }
+                @if (d.running) {
+                  <span class="badge ok">läuft</span>
+                }
+              </td>
+              <td>{{ d.location && d.calc.netMinutes ? locationIcons[d.location] : '' }}</td>
+              <td class="num">{{ d.calc.netMinutes ? fmtDuration(d.calc.netMinutes) : '' }}</td>
+              <td class="num muted">{{ d.targetMinutes ? fmtDuration(d.targetMinutes) : '' }}</td>
+              <td class="num" [class]="signClass(d.diffMinutes)">
+                {{ d.diffMinutes ? fmtDuration(d.diffMinutes, true) : '' }}
+              </td>
+              <td>
+                @if (d.distributableQuarters || d.bookedQuarters) {
+                  @if (remaining(d) === 0) {
+                    <span class="badge ok">✓</span>
+                  } @else if (remaining(d) > 0) {
+                    <span class="badge warn">{{ fmtQuarters(remaining(d)) }} h offen</span>
+                  } @else {
+                    <span class="badge error">{{ fmtQuarters(-remaining(d)) }} h zu viel</span>
+                  }
+                }
+              </td>
+            </tr>
+          }
+          <tr class="week-sum">
+            <td colspan="3">Woche ab {{ fmtDate(w.start).slice(0, 6) }}</td>
+            <td class="num">{{ fmtDuration(w.netMinutes) }}</td>
+            <td class="num">{{ fmtDuration(w.targetMinutes) }}</td>
+            <td class="num" [class]="signClass(w.diffMinutes)">
+              {{ fmtDuration(w.diffMinutes, true) }}
+            </td>
+            <td></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}

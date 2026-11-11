@@ -1,0 +1,293 @@
+<div class="day-header">
+  <button class="btn icon" type="button" (click)="go(-1)" aria-label="Vorheriger Tag">◀</button>
+  <h2>{{ isToday() ? 'Heute · ' : '' }}{{ title() }}</h2>
+  <button class="btn icon" type="button" (click)="go(1)" aria-label="Nächster Tag">▶</button>
+  <input
+    class="input"
+    type="date"
+    aria-label="Datum wählen"
+    [value]="date()"
+    (change)="navigate($any($event.target).value)"
+  />
+  @if (!isToday()) {
+    <a class="btn small" routerLink="">Heute</a>
+  }
+  @if (balanceToday() !== null) {
+    <span class="balance num" title="Überstundenkonto inkl. heute">
+      Saldo:
+      <strong [class]="signClass(balanceToday()!)"
+        >{{ fmtDuration(balanceToday()!, true) }} h</strong
+      >
+    </span>
+  }
+</div>
+
+@if (error()) {
+  <p class="alert error" role="alert">{{ error() }}</p>
+}
+
+@if (day(); as d) {
+  <section class="app-card">
+    <div class="form-row">
+      <div class="segmented" role="group" aria-label="Arbeitsort">
+        <button type="button" [class.active]="d.location === 'home'" (click)="setLocation('home')">
+          {{ locationLabels.home }}
+        </button>
+        <button
+          type="button"
+          [class.active]="d.location === 'office'"
+          (click)="setLocation('office')"
+        >
+          {{ locationLabels.office }}
+        </button>
+      </div>
+      <label class="field">
+        Tagesart
+        <select
+          class="input day-type"
+          [value]="d.dayTypeManual ? d.dayType : ''"
+          (change)="setDayType($any($event.target).value)"
+        >
+          <option value="">Automatisch ({{ d.holidayName ?? dayTypeLabels.work }})</option>
+          @for (t of dayTypes; track t) {
+            <option [value]="t">{{ dayTypeLabels[t] }}</option>
+          }
+        </select>
+      </label>
+      <label class="field grow">
+        Notiz
+        <input
+          class="input"
+          maxlength="500"
+          [value]="d.note ?? ''"
+          (blur)="saveNote($any($event.target).value)"
+        />
+      </label>
+    </div>
+    @if (d.untracked) {
+      <p class="muted small">Dieser Tag liegt vor dem Beginn deiner Zeiterfassung.</p>
+    }
+  </section>
+
+  <section class="app-card">
+    <div class="stamp-row">
+      <button
+        class="btn primary stamp-btn"
+        type="button"
+        [class.running]="d.running"
+        (click)="stamp()"
+        [disabled]="busy()"
+      >
+        ⏱ {{ d.running ? 'GEHEN' : 'KOMMEN' }}
+      </button>
+      <label class="field">
+        Uhrzeit
+        <input
+          class="input"
+          type="time"
+          [(ngModel)]="stampTime"
+          (ngModelChange)="onStampTimeChange()"
+        />
+      </label>
+    </div>
+
+    @if (d.stamps.length) {
+      <ul class="stamps">
+        @for (s of d.stamps; track s.id) {
+          <li>
+            <input class="input" type="time" aria-label="Kommen" [value]="s.start" #st />
+            –
+            <input class="input" type="time" aria-label="Gehen" [value]="s.end ?? ''" #en />
+            @if (!s.end) {
+              <span class="badge ok">läuft</span>
+            }
+            <button class="btn small" type="button" (click)="saveStamp(s, st.value, en.value)">
+              Speichern
+            </button>
+            <button
+              class="btn small icon danger"
+              type="button"
+              aria-label="Stempel löschen"
+              (click)="deleteStamp(s)"
+            >
+              🗑
+            </button>
+          </li>
+        }
+      </ul>
+    }
+
+    <details class="add-stamp">
+      <summary>Stempel nachtragen</summary>
+      <div class="form-row">
+        <label class="field">
+          Kommen
+          <input class="input" type="time" [(ngModel)]="newStart" />
+        </label>
+        <label class="field">
+          Gehen
+          <input class="input" type="time" [(ngModel)]="newEnd" />
+        </label>
+        <button class="btn" type="button" (click)="addStamp()" [disabled]="!newStart">
+          Hinzufügen
+        </button>
+      </div>
+    </details>
+
+    <dl class="totals num">
+      <div>
+        <dt>Brutto</dt>
+        <dd>{{ fmtDuration(d.calc.grossMinutes) }}</dd>
+      </div>
+      <div>
+        <dt>Pause</dt>
+        <dd>
+          {{ fmtDuration(d.calc.breakTakenMinutes + d.calc.breakDeductedMinutes) }}
+          @if (d.calc.breakDeductedMinutes) {
+            <small class="muted">(davon {{ d.calc.breakDeductedMinutes }} min automatisch)</small>
+          }
+        </dd>
+      </div>
+      <div>
+        <dt>Netto</dt>
+        <dd>
+          <strong>{{ fmtDuration(d.calc.netMinutes) }}</strong>
+        </dd>
+      </div>
+      <div>
+        <dt>Soll</dt>
+        <dd>{{ fmtDuration(d.targetMinutes) }}</dd>
+      </div>
+      <div>
+        <dt>Differenz</dt>
+        <dd [class]="signClass(d.diffMinutes)">{{ fmtDuration(d.diffMinutes, true) }}</dd>
+      </div>
+    </dl>
+
+    @for (w of d.calc.warnings; track w) {
+      <p class="alert warn">⚠ {{ warningLabels[w] }}</p>
+    }
+  </section>
+
+  <section class="app-card">
+    <h3 class="card-title">
+      Buchungen
+      <span class="badge" [class]="distributionClass()">
+        @if (remainingQuarters() > 0) {
+          noch zu verteilen {{ fmtQuarters(remainingQuarters()) }} h
+        } @else if (remainingQuarters() < 0) {
+          {{ fmtQuarters(-remainingQuarters()) }} h überbucht
+        } @else {
+          alles verteilt
+        }
+      </span>
+    </h3>
+
+    @if (d.bookings.length) {
+      <ul class="bookings">
+        @for (b of d.bookings; track b.id) {
+          <li>
+            <span class="booking-name">
+              <span class="muted">{{ b.projectName }} ›</span>
+              {{ b.workPackageCode ? b.workPackageCode + ' ' : '' }}{{ b.workPackageName }}
+              @if (b.comment) {
+                <small class="muted">– {{ b.comment }}</small>
+              }
+            </span>
+            <span class="stepper">
+              <button
+                class="btn small"
+                type="button"
+                aria-label="0,25 h weniger"
+                [disabled]="b.quarters <= 1"
+                (click)="changeBooking(b.id, b.quarters - 1)"
+              >
+                −
+              </button>
+              <span class="num">{{ fmtQuarters(b.quarters) }} h</span>
+              <button
+                class="btn small"
+                type="button"
+                aria-label="0,25 h mehr"
+                (click)="changeBooking(b.id, b.quarters + 1)"
+              >
+                +
+              </button>
+            </span>
+            <button
+              class="btn small icon danger"
+              type="button"
+              aria-label="Buchung löschen"
+              (click)="deleteBooking(b.id)"
+            >
+              🗑
+            </button>
+          </li>
+        }
+      </ul>
+    }
+
+    @if (activeProjects().length) {
+      <div class="form-row booking-form">
+        <label class="field grow">
+          Arbeitspaket
+          <select class="input" [(ngModel)]="bookingPackageId">
+            <option [ngValue]="null" disabled>Bitte wählen …</option>
+            @for (p of activeProjects(); track p.id) {
+              <optgroup [label]="(p.code ? p.code + ' ' : '') + p.name">
+                @for (wp of p.packages; track wp.id) {
+                  <option [ngValue]="wp.id">{{ wp.code ? wp.code + ' ' : '' }}{{ wp.name }}</option>
+                }
+              </optgroup>
+            }
+          </select>
+        </label>
+        <span class="stepper">
+          <button
+            class="btn"
+            type="button"
+            aria-label="0,25 h weniger"
+            (click)="setQuarters(bookingQuarters() - 1)"
+          >
+            −
+          </button>
+          <span class="num quarters">{{ fmtQuarters(bookingQuarters()) }} h</span>
+          <button
+            class="btn"
+            type="button"
+            aria-label="0,25 h mehr"
+            (click)="setQuarters(bookingQuarters() + 1)"
+          >
+            +
+          </button>
+        </span>
+      </div>
+      <div class="form-row">
+        @for (q of quick; track q) {
+          <button class="chip" type="button" (click)="setQuarters(q)">{{ fmtQuarters(q) }}</button>
+        }
+        <button
+          class="chip"
+          type="button"
+          [disabled]="remainingQuarters() <= 0"
+          (click)="fillRemaining()"
+        >
+          Rest
+        </button>
+        <input
+          class="input grow"
+          placeholder="Kommentar (optional)"
+          maxlength="500"
+          [(ngModel)]="bookingComment"
+        />
+        <button class="btn primary" type="button" (click)="addBooking()" [disabled]="busy()">
+          Buchen
+        </button>
+      </div>
+    } @else {
+      <p class="muted">
+        Noch keine Arbeitspakete – lege sie unter <a routerLink="/projects">Projekte</a> an.
+      </p>
+    }
+  </section>
+}
