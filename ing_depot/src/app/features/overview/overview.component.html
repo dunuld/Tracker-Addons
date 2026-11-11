@@ -1,0 +1,192 @@
+<div class="page-head">
+  <h2>Depotübersicht</h2>
+  @if (overview(); as o) {
+    <label class="year-select">
+      Jahr
+      <select #year [value]="o.year" (change)="selectYear(year.value)">
+        @for (y of o.years; track y) {
+          <option [value]="y" [selected]="y === o.year">{{ y }}</option>
+        }
+      </select>
+    </label>
+  }
+</div>
+
+@if (error()) {
+  <p class="alert error" role="alert">{{ error() }}</p>
+}
+
+@if (overview(); as o) {
+  @if (isEmpty()) {
+    <div class="app-card empty">
+      <p>Noch keine Daten vorhanden.</p>
+      <p>
+        <a routerLink="/import">Lade deine ING-PDFs hoch</a> (Abrechnungen, Ertragsabrechnungen,
+        Depotauszüge), um die Übersicht zu füllen.
+      </p>
+    </div>
+  } @else {
+    @for (warning of o.warnings; track warning) {
+      <p class="alert warning">{{ warning }}</p>
+    }
+
+    <section class="tiles" aria-label="Kennzahlen">
+      <div class="tile">
+        <span class="tile-label">Investiert {{ o.year }}</span>
+        <span class="tile-value">{{ euro(o.investedGrossCents) }}</span>
+        <span class="tile-sub">netto {{ euro(o.investedNetCents) }} nach Verkäufen</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Realisierte Gewinne</span>
+        <span class="tile-value" [class]="sign(o.realizedCents)">{{
+          signedEuro(o.realizedCents)
+        }}</span>
+        <span class="tile-sub">vor Steuern, nach Gebühren</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Dividenden ausgezahlt</span>
+        <span class="tile-value">{{ euro(o.dividendsNetCents) }}</span>
+        <span class="tile-sub">brutto {{ euro(o.dividendsGrossCents) }}</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Kursgewinn seit 01.01.</span>
+        <span class="tile-value" [class]="sign(o.ytdGainCents)">{{
+          signedEuro(o.ytdGainCents)
+        }}</span>
+        <span class="tile-sub" [class]="sign(o.ytdGainCents)">{{ percent(o.ytdGainPct) }}</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Kursgewinn seit Kauf</span>
+        <span class="tile-value" [class]="sign(o.gainCents)">{{ signedEuro(o.gainCents) }}</span>
+        <span class="tile-sub" [class]="sign(o.gainCents)">{{ percent(o.gainPct) }}</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Depotwert</span>
+        <span class="tile-value">{{ euro(o.valueCents) }}</span>
+        <span class="tile-sub">Einstand {{ euro(o.costCents) }} · Stand {{ date(o.asOf) }}</span>
+      </div>
+    </section>
+
+    <p class="footnote">
+      Steuern {{ o.year }}: {{ euro(o.taxesCents) }} · Gebühren: {{ euro(o.feesCents) }}
+      @if (o.exemptionCents > 0) {
+        · Freistellungsauftrag: {{ euro(o.exemptionUsedCents) }} von
+        {{ euro(o.exemptionCents) }} rechnerisch genutzt
+      }
+    </p>
+
+    @if (hasMonthlyData()) {
+      <section class="app-card">
+        <h3>Monatsverlauf {{ o.year }}</h3>
+        <div class="bars" role="img" aria-label="Investiert und Dividenden je Monat">
+          @for (m of o.monthly; track m.month) {
+            <div class="bar-group">
+              <div class="bar-pair">
+                <div
+                  class="bar invested"
+                  [style.height.%]="barHeight(m.investedCents)"
+                  [title]="'Investiert: ' + euro(m.investedCents)"
+                ></div>
+                <div
+                  class="bar dividends"
+                  [style.height.%]="barHeight(m.dividendsNetCents)"
+                  [title]="'Dividenden: ' + euro(m.dividendsNetCents)"
+                ></div>
+              </div>
+              <span class="bar-label">{{ months[m.month - 1] }}</span>
+            </div>
+          }
+        </div>
+        <p class="legend">
+          <span class="swatch invested"></span> Investiert
+          <span class="swatch dividends"></span> Dividenden (netto)
+        </p>
+      </section>
+    }
+
+    <h3>Positionen</h3>
+    <div class="app-card table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Wertpapier</th>
+            <th class="num">Stück</th>
+            <th class="num">Kurs</th>
+            <th class="num">Wert</th>
+            <th class="num">Seit Kauf</th>
+            <th class="num">Seit 01.01.</th>
+            <th class="num">Realisiert</th>
+            <th class="num">Dividenden</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of o.positions; track p.isin) {
+            <tr>
+              <td>
+                {{ p.name }}
+                <div class="muted">{{ p.isin }}</div>
+              </td>
+              <td class="num">{{ quantity(p.quantity) }}</td>
+              <td class="num">
+                {{ price(p.price) }}
+                @if (p.priceDate) {
+                  <div class="muted">{{ date(p.priceDate) }} · {{ sourceLabel(p) }}</div>
+                }
+              </td>
+              <td class="num">
+                {{ euro(p.valueCents) }}
+                <div class="muted">Einstand {{ euro(p.costCents) }}</div>
+              </td>
+              <td class="num" [class]="sign(p.gainCents)">
+                {{ signedEuro(p.gainCents) }}
+                <div>{{ percent(p.gainPct) }}</div>
+              </td>
+              <td class="num" [class]="sign(p.ytdGainCents)">
+                {{ signedEuro(p.ytdGainCents) }}
+                <div>{{ percent(p.ytdGainPct) }}</div>
+              </td>
+              <td class="num" [class]="sign(p.realizedCents)">{{ signedEuro(p.realizedCents) }}</td>
+              <td class="num">{{ euro(p.dividendsNetCents) }}</td>
+              <td class="actions">
+                <button type="button" class="btn small" (click)="edit(p)">Kurs</button>
+              </td>
+            </tr>
+            @if (editing() === p.isin) {
+              <tr class="edit-row">
+                <td colspan="9">
+                  <form class="inline-form" (ngSubmit)="save(p)">
+                    <label>
+                      Aktueller Kurs (€)
+                      <input
+                        name="price"
+                        [(ngModel)]="priceInput"
+                        inputmode="decimal"
+                        placeholder="z. B. 123,45"
+                      />
+                    </label>
+                    <label>
+                      Kurs aus HA-Entität
+                      <input name="entity" [(ngModel)]="entityInput" placeholder="sensor.…" />
+                    </label>
+                    <button type="submit" class="btn primary">Speichern</button>
+                    <button type="button" class="btn" (click)="cancelEdit()">Abbrechen</button>
+                    @if (editError()) {
+                      <span class="form-error" role="alert">{{ editError() }}</span>
+                    }
+                  </form>
+                </td>
+              </tr>
+            }
+          } @empty {
+            <tr>
+              <td colspan="9" class="muted">Keine Positionen in diesem Jahr.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+} @else if (!error()) {
+  <p class="muted">Lade …</p>
+}

@@ -1,0 +1,34 @@
+name: ING Depot
+version: '0.1.0'
+slug: ing_depot
+description: Depotübersicht aus ING-PDFs (Abrechnungen, Ertragsabrechnungen, Depotauszüge)
+# Experimentell, bis der PDF-Parser mit mehr echten ING-Dokumenten erprobt ist
+stage: experimental
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+init: true
+# Zugriff ausschließlich über HA-Ingress, keine Ports nach außen
+ingress: true
+ingress_port: 8099
+ingress_stream: false
+panel_icon: mdi:chart-line
+panel_title: ING Depot
+panel_admin: false
+# Kennzahlen als Sensoren melden und Kurse aus HA-Entitäten lesen
+homeassistant_api: true
+# Eingangsordner für PDFs (Standard: /share/ing_depot)
+map:
+  - type: share
+    read_only: false
+# /data wird vom Supervisor immer persistent eingebunden (depot.db, documents/)
+options:
+  inbox_folder: /share/ing_depot
+  publish_sensors: true
+  exemption_order: 0
+schema:
+  inbox_folder: str?
+  publish_sensors: bool
+  exemption_order: float(0,)

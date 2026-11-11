@@ -20,6 +20,7 @@ body:
       description: Welches Add-on ist betroffen?
       options:
         - Haushaltsbuch (budget_tracker)
+        - ING Depot (ing_depot)
         - Neues Add-on (new_addon)
         - Repository allgemein (Installation, Workflows, Doku)
     validations:

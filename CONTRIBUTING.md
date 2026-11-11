@@ -16,6 +16,7 @@ README.md                    # Übersicht des Repositorys
 .github/workflows/           # CI, Code Quality und Releases (für alle Add-ons)
 .github/scripts/             # Hilfsskripte der Workflows
 new_addon/                   # Add-on „Neues Add-on“ (Grundgerüst, gleicher Aufbau)
+ing_depot/                   # Add-on „ING Depot“ (gleicher Aufbau)
 budget_tracker/              # Add-on „Haushaltsbuch“
   config.yaml                # Add-on-Konfiguration (Version, Architekturen, Ingress)
   Dockerfile                 # Multi-Stage Build (node:24-alpine)

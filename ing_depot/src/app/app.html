@@ -1,0 +1,24 @@
+<header class="app-header">
+  <nav class="app-nav" aria-label="Hauptnavigation">
+    <div class="nav-brand">ING Depot</div>
+    <div class="nav-links">
+      <a routerLink="" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"
+        >Übersicht</a
+      >
+      <a routerLink="buchungen" routerLinkActive="active">Buchungen</a>
+      <a routerLink="import" routerLinkActive="active">Import</a>
+    </div>
+    <button
+      class="theme-toggle"
+      (click)="themeService.toggle()"
+      [title]="themeTitle()"
+      [attr.aria-label]="themeTitle()"
+      type="button"
+    >
+      {{ themeLabel() }}
+    </button>
+  </nav>
+</header>
+<main class="app-main">
+  <router-outlet></router-outlet>
+</main>

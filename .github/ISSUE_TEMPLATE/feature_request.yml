@@ -15,6 +15,7 @@ body:
       description: Für welches Add-on ist der Vorschlag gedacht?
       options:
         - Haushaltsbuch (budget_tracker)
+        - ING Depot (ing_depot)
         - Neues Add-on (new_addon)
         - Repository allgemein (Installation, Workflows, Doku)
         - Neues Add-on-Vorschlag
