@@ -1,0 +1,161 @@
+<h2>Projekte</h2>
+
+@if (error()) {
+  <p class="alert error" role="alert">{{ error() }}</p>
+}
+
+<section class="app-card">
+  <h3 class="card-title">Neues Projekt</h3>
+  <div class="form-row">
+    <label class="field code">
+      Code
+      <input class="input" maxlength="40" [(ngModel)]="newProject.code" placeholder="optional" />
+    </label>
+    <label class="field grow">
+      Name
+      <input class="input" maxlength="120" [(ngModel)]="newProject.name" />
+    </label>
+    <button class="btn primary" type="button" (click)="addProject()" [disabled]="!newProject.name">
+      Anlegen
+    </button>
+  </div>
+</section>
+
+<label class="toggle">
+  <input type="checkbox" [checked]="showArchived()" (change)="showArchived.set(!showArchived())" />
+  Archivierte anzeigen
+</label>
+
+@for (p of visible(); track p.id) {
+  <section class="app-card" [class.archived]="!p.active">
+    @if (editing() === 'project-' + p.id) {
+      <div class="form-row">
+        <input class="input code" aria-label="Code" maxlength="40" [(ngModel)]="edit.code" />
+        <input class="input grow" aria-label="Name" maxlength="120" [(ngModel)]="edit.name" />
+        <button class="btn primary small" type="button" (click)="saveProject(p)">Speichern</button>
+        <button class="btn small" type="button" (click)="cancelEdit()">Abbrechen</button>
+      </div>
+    } @else {
+      <h3 class="card-title">
+        <span>
+          @if (p.code) {
+            <span class="muted">{{ p.code }}</span>
+          }
+          {{ p.name }}
+          @if (!p.active) {
+            <span class="badge">archiviert</span>
+          }
+        </span>
+        <span class="actions">
+          <span class="num muted">{{ fmtQuarters(p.bookedQuarters) }} h</span>
+          <button class="btn small" type="button" (click)="startEdit('project-' + p.id, p)">
+            Bearbeiten
+          </button>
+          <button class="btn small" type="button" (click)="toggleProject(p)">
+            {{ p.active ? 'Archivieren' : 'Reaktivieren' }}
+          </button>
+          @if (!p.bookedQuarters) {
+            <button class="btn small danger" type="button" (click)="deleteProject(p)">
+              Löschen
+            </button>
+          }
+        </span>
+      </h3>
+    }
+
+    <ul class="packages">
+      @for (wp of packages(p); track wp.id) {
+        <li [class.archived]="!wp.active">
+          @if (editing() === 'package-' + wp.id) {
+            <div class="form-row">
+              <input class="input code" aria-label="Code" maxlength="40" [(ngModel)]="edit.code" />
+              <input class="input grow" aria-label="Name" maxlength="120" [(ngModel)]="edit.name" />
+              <input
+                class="input budget"
+                aria-label="Budget in Stunden"
+                placeholder="Budget h"
+                inputmode="decimal"
+                [(ngModel)]="edit.budget"
+              />
+              <button class="btn primary small" type="button" (click)="savePackage(wp)">
+                Speichern
+              </button>
+              <button class="btn small" type="button" (click)="cancelEdit()">Abbrechen</button>
+            </div>
+          } @else {
+            <span class="pkg-name">
+              @if (wp.code) {
+                <span class="muted">{{ wp.code }}</span>
+              }
+              {{ wp.name }}
+              @if (!wp.active) {
+                <span class="badge">archiviert</span>
+              }
+            </span>
+            <span class="num usage">
+              {{ fmtQuarters(wp.bookedQuarters) }} h
+              @if (wp.budgetQuarters) {
+                / {{ fmtQuarters(wp.budgetQuarters) }} h
+                <span class="bar" [title]="usage(wp) + ' %'">
+                  <span
+                    [style.width.%]="usage(wp) > 100 ? 100 : usage(wp)"
+                    [class.over]="usage(wp) > 100"
+                  ></span>
+                </span>
+              }
+            </span>
+            <span class="actions">
+              <button class="btn small" type="button" (click)="startEdit('package-' + wp.id, wp)">
+                Bearbeiten
+              </button>
+              <button class="btn small" type="button" (click)="togglePackage(wp)">
+                {{ wp.active ? 'Archivieren' : 'Reaktivieren' }}
+              </button>
+              @if (!wp.bookedQuarters) {
+                <button class="btn small danger" type="button" (click)="deletePackage(wp)">
+                  Löschen
+                </button>
+              }
+            </span>
+          }
+        </li>
+      }
+    </ul>
+
+    @if (p.active) {
+      <div class="form-row new-package">
+        <input
+          class="input code"
+          aria-label="Code des Arbeitspakets"
+          placeholder="Code"
+          maxlength="40"
+          [(ngModel)]="packageDraft(p.id).code"
+        />
+        <input
+          class="input grow"
+          aria-label="Name des Arbeitspakets"
+          placeholder="Neues Arbeitspaket"
+          maxlength="120"
+          [(ngModel)]="packageDraft(p.id).name"
+        />
+        <input
+          class="input budget"
+          aria-label="Budget in Stunden"
+          placeholder="Budget h"
+          inputmode="decimal"
+          [(ngModel)]="packageDraft(p.id).budget"
+        />
+        <button
+          class="btn small"
+          type="button"
+          (click)="addPackage(p)"
+          [disabled]="!packageDraft(p.id).name"
+        >
+          + Arbeitspaket
+        </button>
+      </div>
+    }
+  </section>
+} @empty {
+  <p class="muted">Noch keine Projekte angelegt.</p>
+}

@@ -1,0 +1,102 @@
+<h2>Einstellungen</h2>
+
+@if (error()) {
+  <p class="alert error" role="alert">{{ error() }}</p>
+}
+
+<section class="app-card">
+  <h3 class="card-title">Persönlich</h3>
+  <div class="form-row">
+    <label class="field">
+      Bundesland (Feiertage)
+      <select class="input" [(ngModel)]="region">
+        @for (r of regions(); track r.code) {
+          <option [value]="r.code">{{ r.name }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      Standard-Ort
+      <select class="input" [(ngModel)]="defaultLocation">
+        <option value="office">Office</option>
+        <option value="home">Home Office</option>
+      </select>
+    </label>
+    <label class="field">
+      Zeiterfassung ab
+      <input class="input" type="date" [(ngModel)]="trackingStart" />
+    </label>
+    <label class="field">
+      Übertrag Überstunden (h)
+      <input class="input" inputmode="decimal" [(ngModel)]="openingHours" />
+    </label>
+  </div>
+  <label class="check">
+    <input type="checkbox" [(ngModel)]="autoBreak" />
+    Fehlende gesetzliche Pause automatisch abziehen (über 6 h: 30 min, über 9 h: 45 min)
+  </label>
+  <button class="btn primary" type="button" (click)="saveSettings()">Speichern</button>
+  @if (saved()) {
+    <span class="saved">✓ Gespeichert</span>
+  }
+</section>
+
+<section class="app-card">
+  <h3 class="card-title">Arbeitszeitmodelle</h3>
+  <p class="muted">
+    Änderungen der Wochenstunden gelten ab dem angegebenen Datum – frühere Tage und der bisherige
+    Saldo bleiben unverändert.
+  </p>
+  <div class="table-scroll">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Gültig ab</th>
+          <th class="num">Woche</th>
+          <th>Arbeitstage</th>
+          <th class="num">pro Tag</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of schedules(); track s.id) {
+          <tr>
+            <td>{{ fmtDate(s.validFrom) }}</td>
+            <td class="num">{{ fmtDuration(s.weeklyMinutes) }} h</td>
+            <td>{{ dayList(s) }}</td>
+            <td class="num">{{ fmtDuration(dailyMinutes(s)) }} h</td>
+            <td>
+              @if (schedules().length > 1) {
+                <button class="btn small danger" type="button" (click)="deleteSchedule(s)">
+                  Löschen
+                </button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Neues Modell</h4>
+  <div class="form-row">
+    <label class="field">
+      Gültig ab
+      <input class="input" type="date" [(ngModel)]="validFrom" />
+    </label>
+    <label class="field">
+      Wochenstunden
+      <input class="input" inputmode="decimal" [(ngModel)]="weeklyHours" />
+    </label>
+    <fieldset class="days">
+      <legend class="muted">Arbeitstage</legend>
+      @for (d of weekdays; track d) {
+        <label
+          ><input type="checkbox" [checked]="workdays().includes(d)" (change)="toggleDay(d)" />
+          {{ weekdayLabels[d] }}</label
+        >
+      }
+    </fieldset>
+    <button class="btn primary" type="button" (click)="addSchedule()">Übernehmen</button>
+  </div>
+</section>

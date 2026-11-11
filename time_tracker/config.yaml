@@ -1,0 +1,21 @@
+name: Zeiterfassung
+version: '0.1.0'
+slug: time_tracker
+description: Arbeitszeiterfassung mit Kommen/Gehen, Home Office, Arbeitspaketen und Überstundenkonto
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+init: true
+# Zugriff ausschließlich über HA-Ingress, keine Ports nach außen.
+# Der Ingress-Proxy übermittelt den angemeldeten HA-Benutzer – jede Person sieht nur ihre Daten.
+ingress: true
+ingress_port: 8099
+ingress_stream: false
+panel_icon: mdi:clock-check-outline
+panel_title: Zeiterfassung
+panel_admin: false
+# /data wird vom Supervisor immer persistent eingebunden (time_tracker.db)
+options: {}
+schema: {}

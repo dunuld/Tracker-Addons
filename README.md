@@ -26,6 +26,17 @@ _Haushaltsbuch für ING-Kontoauszüge (PDF) mit automatischer Kategorisierung._
 
 [Dokumentation](budget_tracker/DOCS.md) · [Changelog](budget_tracker/CHANGELOG.md)
 
+### [Zeiterfassung](./time_tracker)
+
+![Version][time-tracker-version-badge]
+![amd64][amd64-badge]
+![aarch64][aarch64-badge]
+
+_Arbeitszeiterfassung mit Kommen/Gehen, Home Office, Arbeitspaketen in 0,25-h-Schritten und
+Überstundenkonto – getrennt für jeden Home-Assistant-Benutzer._
+
+[Dokumentation](time_tracker/DOCS.md) · [Changelog](time_tracker/CHANGELOG.md)
+
 ### [Neues Add-on](./new_addon)
 
 ![Version][new-addon-version-badge]
@@ -76,6 +87,7 @@ Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).
 [budget-tracker-version-badge]: https://img.shields.io/badge/dynamic/yaml?label=Version&query=%24.version&url=https%3A%2F%2Fraw.githubusercontent.com%2Fdunuld%2Fhassio-addons%2Fmain%2Fbudget_tracker%2Fconfig.yaml
 [budget-tracker-release-badge]: https://img.shields.io/github/v/release/dunuld/hassio-addons?filter=budget_tracker-v*&label=Release
 [budget-tracker-releases]: https://github.com/dunuld/hassio-addons/releases?q=budget_tracker-v&expanded=true
+[time-tracker-version-badge]: https://img.shields.io/badge/dynamic/yaml?label=Version&query=%24.version&url=https%3A%2F%2Fraw.githubusercontent.com%2Fdunuld%2Fhassio-addons%2Fmain%2Ftime_tracker%2Fconfig.yaml
 [new-addon-version-badge]: https://img.shields.io/badge/dynamic/yaml?label=Version&query=%24.version&url=https%3A%2F%2Fraw.githubusercontent.com%2Fdunuld%2Fhassio-addons%2Fmain%2Fnew_addon%2Fconfig.yaml
 [experimental-badge]: https://img.shields.io/badge/stage-experimental-orange
 [amd64-badge]: https://img.shields.io/badge/amd64-yes-green

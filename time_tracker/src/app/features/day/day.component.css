@@ -1,0 +1,115 @@
+.day-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.day-header h2 {
+  margin: 0;
+}
+
+.balance {
+  margin-left: auto;
+  font-size: 0.95rem;
+}
+
+.grow {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.stamp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.stamp-btn {
+  min-height: 56px;
+  min-width: 11rem;
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+}
+
+.stamp-btn.running {
+  background: var(--app-warning-text);
+  border-color: var(--app-warning-text);
+}
+
+.stamps,
+.bookings {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.stamps li,
+.bookings li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.add-stamp {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.add-stamp summary {
+  cursor: pointer;
+  color: var(--app-primary);
+  margin-bottom: 0.5rem;
+}
+
+.totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 1rem 0 0;
+}
+
+.totals dt {
+  font-size: 0.75rem;
+  color: var(--app-text-secondary);
+}
+
+.totals dd {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.booking-name {
+  flex: 1;
+  min-width: 12rem;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.quarters {
+  min-width: 4rem;
+  text-align: center;
+  font-size: 1.05rem;
+}
+
+.booking-form {
+  margin-top: 1rem;
+}
+
+.chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

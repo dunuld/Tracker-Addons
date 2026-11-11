@@ -1,0 +1,80 @@
+.grow {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.code {
+  width: 8rem;
+}
+
+.budget {
+  width: 6.5rem;
+}
+
+.toggle {
+  display: inline-block;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--app-text-secondary);
+}
+
+.archived {
+  opacity: 0.65;
+}
+
+.actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.packages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.packages li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--app-border);
+}
+
+.pkg-name {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.usage {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.bar {
+  display: inline-block;
+  width: 5rem;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--app-bg-tertiary);
+  overflow: hidden;
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  background: var(--app-primary);
+}
+
+.bar span.over {
+  background: var(--app-error-text);
+}
+
+.new-package {
+  margin-top: 0.75rem;
+}
